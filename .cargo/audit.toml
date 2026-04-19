@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2023-0071", # Marvin Attack (RSA): No fix available for transitive dependency through sqlx.
+    "RUSTSEC-2026-0097", # Rand unsoundness with custom logger: No fix available for rand 0.8.5.
+]

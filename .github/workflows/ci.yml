@@ -1,0 +1,91 @@
+# CI Pipeline for fastserial-rs
+# 
+# Purpose: Runs tests, linting, and coverage on every push/PR to dev or main.
+# 
+name: CI 
+
+on: 
+  push: 
+    branches: [main, dev] 
+  pull_request: 
+    branches: [main, dev] 
+
+env: 
+  CARGO_TERM_COLOR: always 
+  RUST_BACKTRACE: 1 
+
+jobs: 
+  test: 
+    name: Test (${{ matrix.rust }} on ${{ matrix.os }}) 
+    runs-on: ${{ matrix.os }} 
+    strategy: 
+      fail-fast: false 
+      matrix: 
+        rust: [stable, beta, "1.94.0"]  # MSRV = 1.94.0 
+        os: [ubuntu-latest, macos-latest, windows-latest] 
+        exclude: 
+          - rust: beta 
+            os: macos-latest 
+          - rust: beta 
+            os: windows-latest 
+
+    steps: 
+      - uses: actions/checkout@v4 
+      - name: Install Rust ${{ matrix.rust }} 
+        uses: dtolnay/rust-toolchain@stable 
+        with: 
+          toolchain: ${{ matrix.rust }} 
+      - uses: Swatinem/rust-cache@v2 
+      - name: Build
+        run: cargo build --workspace --all-features
+      - name: Test
+        run: cargo test --workspace --all-features
+      - name: Doc tests
+        run: cargo test --doc --workspace
+
+  fmt: 
+    name: Rustfmt 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
+      - uses: dtolnay/rust-toolchain@stable 
+        with: 
+          components: rustfmt 
+      - run: cargo fmt --all -- --check 
+
+  docs: 
+    name: Docs 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
+      - uses: dtolnay/rust-toolchain@stable 
+      - uses: Swatinem/rust-cache@v2 
+      - name: Build docs 
+        run: cargo doc --no-deps --all-features 
+        env: 
+          RUSTDOCFLAGS: "-D warnings" 
+
+  audit: 
+    name: Security Audit 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
+      - uses: rustsec/audit-check@v1 
+        with: 
+          token: ${{ secrets.GITHUB_TOKEN }} 
+
+  coverage: 
+    name: Coverage 
+    runs-on: ubuntu-latest 
+    steps: 
+      - uses: actions/checkout@v4 
+      - uses: dtolnay/rust-toolchain@stable 
+      - uses: Swatinem/rust-cache@v2 
+      - name: Install tarpaulin 
+        run: cargo install cargo-tarpaulin 
+      - name: Generate coverage 
+        run: cargo tarpaulin --workspace --out Xml --output-dir coverage/ 
+      - name: Upload to Codecov 
+        uses: codecov/codecov-action@v3 
+        with: 
+          file: coverage/cobertura.xml 

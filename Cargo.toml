@@ -1,0 +1,79 @@
+[workspace]
+members = [
+    ".",
+    "fastserial-derive",
+    "sample-axum",
+]
+resolver = "2"
+
+[package]
+name        = "fastserial"
+version     = "0.1.0"
+edition     = "2024"
+rust-version = "1.94"
+authors     = ["j4flmao"]
+description = "Ultra-fast, zero-copy serialization/deserialization library for Rust with SIMD acceleration"
+license     = "MIT OR Apache-2.0"
+repository  = "https://github.com/j4flmao/fastserial-rs"
+documentation = "https://docs.rs/fastserial"
+homepage    = "https://github.com/j4flmao/fastserial-rs"
+keywords    = ["serialization", "zero-copy", "simd", "performance", "no_std"]
+categories  = ["encoding", "no-std", "parsing", "wasm"]
+readme      = "README.md"
+
+[lib]
+name = "fastserial"
+path = "src/lib.rs"
+
+[features]
+default  = ["json", "binary", "std"]
+std      = []
+json     = ["dep:itoa", "dep:ryu"]
+binary   = []
+msgpack  = []
+arena    = []
+log      = ["dep:log"]
+serde-compat = ["dep:serde"]
+chrono   = ["dep:chrono"]
+profile  = []
+
+[dependencies]
+fastserial-derive = { version = "0.1.0", path = "fastserial-derive" }
+itoa  = { version = "1", optional = true }
+ryu   = { version = "1", optional = true }
+log   = { version = "0.4", optional = true }
+serde = { version = "1", optional = true }
+chrono = { version = "0.4", optional = true, default-features = false, features = ["alloc"] }
+
+[build-dependencies]
+rustc_version = "0.4"
+
+[dev-dependencies]
+criterion  = { version = "0.8", features = ["html_reports"] }
+serde_json = "1"
+serde      = { version = "1", features = ["derive"] }
+
+[[bench]]
+name    = "json_throughput"
+harness = false
+
+[[bench]]
+name    = "binary_throughput"
+harness = false
+
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "symbols"
+
+[profile.bench]
+inherits = "release"
+debug    = true
+
+[profile.dev]
+opt-level = 1
+
+[profile.test]
+opt-level = 0

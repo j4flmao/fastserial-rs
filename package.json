@@ -1,0 +1,15 @@
+{
+  "name": "fastserial-rs",
+  "version": "0.1.0",
+  "description": "Ultra-fast, zero-copy serialization/deserialization library for Rust",
+  "private": true,
+  "scripts": {
+    "prepare": "husky install",
+    "lint:commit": "commitlint --edit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0"
+  }
+}

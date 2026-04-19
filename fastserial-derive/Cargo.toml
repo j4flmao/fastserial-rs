@@ -1,0 +1,20 @@
+[package]
+name    = "fastserial-derive"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Procedural macros for fastserial - the ultra-fast serialization library"
+license = "MIT OR Apache-2.0"
+repository  = "https://github.com/j4flmao/fastserial-rs"
+homepage = "https://github.com/j4flmao/fastserial-rs"
+readme = "README.md"
+keywords = ["serialization", "proc-macro", "derive", "fast"]
+categories = ["development-tools", "encoding"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn      = { version = "2", features = ["full", "parsing", "extra-traits"] }
+quote    = "1"
+proc-macro2 = "1"

@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "name": "John Doe",
+  "email": "john@example.com",
+  "active": true,
+  "balance": 1234.56,
+  "tags": ["premium", "verified"],
+  "metadata": {
+    "created": "2024-01-01",
+    "last_login": "2024-03-15"
+  }
+}
