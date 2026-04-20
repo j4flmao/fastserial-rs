@@ -3,6 +3,7 @@ members = [
     ".",
     "fastserial-derive",
     "sample-axum",
+    "api-bench",
 ]
 resolver = "2"
 
@@ -59,6 +60,10 @@ harness = false
 
 [[bench]]
 name    = "binary_throughput"
+harness = false
+
+[[bench]]
+name    = "full_comparison"
 harness = false
 
 [profile.release]

@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "name": "Wireless Mouse",
+    "description": "Ergonomic wireless mouse",
+    "price": 29.99,
+    "category": "Electronics",
+    "tags": ["wireless", "mouse", "ergonomic"],
+    "stock": 100,
+    "is_available": true,
+    "weight_kg": 0.15,
+    "dimensions": {"width_cm": 6.5, "height_cm": 10.5, "depth_cm": 4.0},
+    "specs": {"battery_life_hours": 24, "connectivity": ["bluetooth_5.0"], "driver_size_mm": 0, "impedance_ohm": 0, "frequency_response": ""},
+    "variants": []
+  },
+  {
+    "id": 2,
+    "name": "Mechanical Keyboard",
+    "description": "RGB mechanical keyboard",
+    "price": 89.99,
+    "category": "Electronics",
+    "tags": ["keyboard", "mechanical", "rgb"],
+    "stock": 50,
+    "is_available": true,
+    "weight_kg": 1.2,
+    "dimensions": {"width_cm": 44.0, "height_cm": 14.0, "depth_cm": 4.5},
+    "specs": {"battery_life_hours": 0, "connectivity": ["usb_c"], "driver_size_mm": 0, "impedance_ohm": 0, "frequency_response": ""},
+    "variants": []
+  },
+  {
+    "id": 3,
+    "name": "USB-C Hub",
+    "description": "7-in-1 USB-C hub",
+    "price": 49.99,
+    "category": "Electronics",
+    "tags": ["usb-c", "hub", "accessory"],
+    "stock": 75,
+    "is_available": true,
+    "weight_kg": 0.08,
+    "dimensions": {"width_cm": 5.0, "height_cm": 5.0, "depth_cm": 1.5},
+    "specs": {"battery_life_hours": 0, "connectivity": ["usb_c"], "driver_size_mm": 0, "impedance_ohm": 0, "frequency_response": ""},
+    "variants": []
+  },
+  {
+    "id": 4,
+    "name": "Monitor Stand",
+    "description": "Adjustable monitor stand",
+    "price": 39.99,
+    "category": "Office",
+    "tags": ["monitor", "stand", "adjustable"],
+    "stock": 30,
+    "is_available": true,
+    "weight_kg": 2.5,
+    "dimensions": {"width_cm": 40.0, "height_cm": 25.0, "depth_cm": 25.0},
+    "specs": {"battery_life_hours": 0, "connectivity": [], "driver_size_mm": 0, "impedance_ohm": 0, "frequency_response": ""},
+    "variants": []
+  },
+  {
+    "id": 5,
+    "name": "Webcam HD",
+    "description": "1080p HD webcam",
+    "price": 59.99,
+    "category": "Electronics",
+    "tags": ["webcam", "hd", "video"],
+    "stock": 45,
+    "is_available": true,
+    "weight_kg": 0.2,
+    "dimensions": {"width_cm": 8.0, "height_cm": 5.0, "depth_cm": 6.0},
+    "specs": {"battery_life_hours": 0, "connectivity": ["usb"], "driver_size_mm": 0, "impedance_ohm": 0, "frequency_response": ""},
+    "variants": []
+  }
+]

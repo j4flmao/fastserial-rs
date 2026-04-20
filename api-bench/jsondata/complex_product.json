@@ -1,0 +1,28 @@
+{
+  "id": 101,
+  "name": "Premium Wireless Headphones",
+  "description": "High-quality noise-cancelling headphones with premium sound",
+  "price": 299.99,
+  "category": "Electronics",
+  "tags": ["audio", "wireless", "premium", "noise-cancelling"],
+  "stock": 150,
+  "is_available": true,
+  "weight_kg": 0.35,
+  "dimensions": {
+    "width_cm": 20.5,
+    "height_cm": 18.0,
+    "depth_cm": 8.5
+  },
+  "specs": {
+    "battery_life_hours": 30,
+    "connectivity": ["bluetooth_5.0", "aux"],
+    "driver_size_mm": 40,
+    "impedance_ohm": 32,
+    "frequency_response": "20Hz - 20kHz"
+  },
+  "variants": [
+    { "color": "black", "sku": "WH-001-BLK", "stock": 50 },
+    { "color": "white", "sku": "WH-001-WHT", "stock": 45 },
+    { "color": "blue", "sku": "WH-001-BLU", "stock": 55 }
+  ]
+}

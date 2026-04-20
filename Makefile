@@ -1,4 +1,4 @@
-.PHONY: all build release test check fmt lint audit doc bench clean help run-sample
+.PHONY: all build release test check fmt lint audit doc bench clean help run-sample run-bench-api
 
 # Default target
 all: fmt lint test build
@@ -38,7 +38,10 @@ clean:
 
 ## Run targets
 run-sample:
-	cargo run -p sample-axum
+ cargo run -p sample-axum
+
+run-bench-api:
+ cargo run -p api-bench
 
 ## Help
 help:

@@ -6,7 +6,6 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     let name = &input.ident;
     let (_, ty_gens, where_clause) = input.generics.split_for_impl();
 
-    // Create impl generics with 'de lifetime
     let mut impl_generics = input.generics.clone();
     let mut has_de = false;
     let mut lifetimes = Vec::new();
@@ -24,7 +23,6 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     if !has_de {
         let mut de_param: syn::LifetimeParam = syn::parse_quote!('de);
 
-        // Add bounds 'de: 'a for all existing lifetimes
         for lt in lifetimes {
             de_param.bounds.push(lt);
         }
@@ -68,15 +66,15 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
             }
         }
 
-        let var_name = format!("f_{}", field_name);
-        let var_ident = syn::Ident::new(&var_name, proc_macro2::Span::call_site());
-
         if skip {
             field_defaults.extend(quote! {
                 #field_name: Default::default(),
             });
             continue;
         }
+
+        let var_name = format!("f_{}", field_name);
+        let var_ident = syn::Ident::new(&var_name, proc_macro2::Span::call_site());
 
         field_inits.extend(quote! {
             let mut #var_ident: Option<#field_ty> = None;
@@ -87,7 +85,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         });
 
         decode_body.extend(quote! {
-            #field_name_str => {
+            bs if bs == #field_name_str.as_bytes() => {
                 #var_ident = Some(::fastserial::Decode::decode(r)?);
             }
         });
@@ -95,7 +93,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
 
     quote! {
         impl #impl_gens ::fastserial::Decode<'de> for #name #ty_gens #where_clause {
-            #[inline]
+            #[inline(always)]
             fn decode(r: &mut ::fastserial::io::ReadBuffer<'de>) -> ::core::result::Result<Self, ::fastserial::Error> {
                 #field_inits
 
@@ -117,15 +115,14 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
                     }
                     first = false;
 
-                    let key = ::fastserial::codec::json::read_string(r)?;
+                    let key_bytes = ::fastserial::codec::json::read_key_fast(r)?;
                     ::fastserial::codec::json::skip_whitespace(r);
                     r.expect_byte(b':')?;
                     ::fastserial::codec::json::skip_whitespace(r);
 
-                    match key {
+                    match key_bytes {
                         #decode_body
                         _ => {
-                            // Skip unknown fields
                             ::fastserial::codec::json::skip_value(r)?;
                         }
                     }
@@ -138,7 +135,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         }
 
         impl #impl_gens #name #ty_gens #where_clause {
-            pub const SCHEMA_HASH: u64 = 0; // TODO: Implement schema hashing
+            pub const SCHEMA_HASH: u64 = 0;
         }
     }
 }

@@ -33,6 +33,39 @@ pub unsafe fn scan_quote_or_backslash(input: &[u8]) -> usize {
     i + super::scalar::scan_quote_or_backslash(&input[i..])
 }
 
+#[target_feature(enable = "avx2")]
+#[allow(unused_unsafe)]
+pub unsafe fn scan_escape_chars(input: &[u8]) -> usize {
+    use core::arch::x86_64::*;
+    let quote = unsafe { _mm256_set1_epi8(b'"' as i8) };
+    let backslash = unsafe { _mm256_set1_epi8(b'\\' as i8) };
+    let lf = unsafe { _mm256_set1_epi8(b'\n' as i8) };
+    let cr = unsafe { _mm256_set1_epi8(b'\r' as i8) };
+    let tab = unsafe { _mm256_set1_epi8(b'\t' as i8) };
+
+    let mut i = 0usize;
+    while i + 32 <= input.len() {
+        let chunk = unsafe { _mm256_loadu_si256(input.as_ptr().add(i) as *const __m256i) };
+        let eq_q = unsafe { _mm256_cmpeq_epi8(chunk, quote) };
+        let eq_bs = unsafe { _mm256_cmpeq_epi8(chunk, backslash) };
+        let eq_lf = unsafe { _mm256_cmpeq_epi8(chunk, lf) };
+        let eq_cr = unsafe { _mm256_cmpeq_epi8(chunk, cr) };
+        let eq_tab = unsafe { _mm256_cmpeq_epi8(chunk, tab) };
+        let has_escape = unsafe {
+            _mm256_or_si256(
+                _mm256_or_si256(_mm256_or_si256(eq_q, eq_bs), _mm256_or_si256(eq_lf, eq_cr)),
+                eq_tab,
+            )
+        };
+        let mask = unsafe { _mm256_movemask_epi8(has_escape) as u32 };
+        if mask != 0 {
+            return i + mask.trailing_zeros() as usize;
+        }
+        i += 32;
+    }
+    i + super::scalar::scan_escape_chars(&input[i..])
+}
+
 /// Skips all leading JSON whitespace characters (space, tab, newline, carriage return)
 /// using AVX2 SIMD instructions.
 ///
