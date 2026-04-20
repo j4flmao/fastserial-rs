@@ -77,43 +77,15 @@ jobs:
           sed -i "s/^version[[:space:]]*=[[:space:]]*\".*\"/version = \"$VERSION\"/" fastserial-derive/Cargo.toml
           sed -i "s/fastserial-derive[[:space:]]*=[[:space:]]*{[[:space:]]*version[[:space:]]*=[[:space:]]*\"[^\"]*\"/fastserial-derive = { version = \"$VERSION\"/" Cargo.toml
 
-      - name: Check if version already published
-        id: check-derive
-        shell: bash
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          RESPONSE=$(curl -s "https://crates.io/api/v1/crates/fastserial-derive/$VERSION")
-          if echo "$RESPONSE" | jq -e '.errors' > /dev/null 2>&1; then
-            echo "derive_skipped=false"
-          else
-            echo "derive_skipped=true"
-          fi >> $GITHUB_OUTPUT
-          echo "✅ Checked fastserial-derive v$VERSION"
-
       - name: Publish fastserial-derive
-        if: steps.check-derive.outputs.derive_skipped != 'true'
         run: cargo publish -p fastserial-derive --no-verify --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
       - name: Wait for crates.io index
-        if: steps.check-derive.outputs.derive_skipped != 'true'
         run: sleep 30
 
-      - name: Check if fastserial already published
-        id: check-fastserial
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          RESPONSE=$(curl -s "https://crates.io/api/v1/crates/fastserial/$VERSION")
-          if echo "$RESPONSE" | jq -e '.errors' > /dev/null 2>&1; then
-            echo "serial_skipped=false"
-          else
-            echo "serial_skipped=true"
-          fi >> $GITHUB_OUTPUT
-          echo "✅ Checked fastserial v$VERSION"
-
       - name: Publish fastserial
-        if: steps.check-fastserial.outputs.serial_skipped != 'true'
         run: cargo publish -p fastserial --no-verify --allow-dirty
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
