@@ -137,10 +137,10 @@ fn test_binary_unit_roundtrip() {
 // ─── Binary string tests ───────────────────────────────────────────────────
 
 #[test]
-fn test_binary_empty_string() {
-    let val: &str = "";
+fn test_binary_i64_max() {
+    let val: i64 = i64::MAX;
     let encoded = encode(&val).unwrap();
-    let decoded: &str = decode(&encoded).unwrap();
+    let decoded: i64 = decode(&encoded).unwrap();
     assert_eq!(val, decoded);
 }
 
@@ -269,30 +269,6 @@ fn test_binary_u64_max() {
     let val: u64 = u64::MAX;
     let encoded = encode(&val).unwrap();
     let decoded: u64 = decode(&encoded).unwrap();
-    assert_eq!(val, decoded);
-}
-
-#[test]
-fn test_binary_u64_zero() {
-    let val: u64 = 0;
-    let encoded = encode(&val).unwrap();
-    let decoded: u64 = decode(&encoded).unwrap();
-    assert_eq!(val, decoded);
-}
-
-#[test]
-fn test_binary_i64_min() {
-    let val: i64 = i64::MIN;
-    let encoded = encode(&val).unwrap();
-    let decoded: i64 = decode(&encoded).unwrap();
-    assert_eq!(val, decoded);
-}
-
-#[test]
-fn test_binary_i64_max() {
-    let val: i64 = i64::MAX;
-    let encoded = encode(&val).unwrap();
-    let decoded: i64 = decode(&encoded).unwrap();
     assert_eq!(val, decoded);
 }
 

@@ -1,0 +1,1 @@
+[{"test_type":"Batch (15 users)","sample_size":5000,"total_records":75000,"fastserial_encode_ms":9.4194,"serde_json_encode_ms":19.2188,"fastserial_decode_ms":33.2185,"serde_json_decode_ms":25.5316,"encode_speedup":2.0403422723315714,"decode_speedup":0.7685958125743186}]

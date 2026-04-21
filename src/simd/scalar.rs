@@ -17,6 +17,16 @@ pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
         .unwrap_or(input.len())
 }
 
+#[inline]
+pub fn scan_escape_chars(input: &[u8]) -> usize {
+    for (i, &b) in input.iter().enumerate() {
+        if b == b'"' || b == b'\\' || b == b'\n' || b == b'\r' || b == b'\t' {
+            return i;
+        }
+    }
+    input.len()
+}
+
 /// Skips leading whitespace characters.
 ///
 /// Skips space (0x20), tab (0x09), newline (0x0A), and carriage return (0x0D).

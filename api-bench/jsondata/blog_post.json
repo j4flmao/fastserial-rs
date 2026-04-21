@@ -1,0 +1,92 @@
+{
+  "id": 1001,
+  "title": "Understanding Rust Zero-Copy Serialization",
+  "slug": "rust-zero-copy-serialization",
+  "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "excerpt": "Learn how to achieve zero-copy serialization in Rust for maximum performance...",
+  "author": {
+    "id": 42,
+    "username": "rustacean_dev",
+    "display_name": "Sarah Chen",
+    "bio": "Senior Software Engineer specializing in systems programming",
+    "avatar_url": "https://example.com/avatars/sarah.jpg",
+    "social_links": {
+      "twitter": "https://twitter.com/sarahchen",
+      "github": "https://github.com/sarahchen"
+    }
+  },
+  "category": {
+    "id": 5,
+    "name": "Rust Programming",
+    "slug": "rust-programming",
+    "parent": {
+      "id": 1,
+      "name": "Programming",
+      "slug": "programming"
+    }
+  },
+  "tags": ["rust", "serialization", "performance", "zero-copy", "simd"],
+  "featured_image": "https://example.com/images/rust-serialization.jpg",
+  "status": "published",
+  "view_count": 15234,
+  "like_count": 892,
+  "comment_count": 45,
+  "reading_time_minutes": 8,
+  "published_at": "2024-01-10T09:00:00Z",
+  "updated_at": "2024-01-12T15:30:00Z",
+  "comments": [
+    {
+      "id": 5001,
+      "author": {
+        "id": 101,
+        "username": "dev_one",
+        "display_name": "Mike Smith"
+      },
+      "content": "Great article! This really helped me understand zero-copy.",
+      "likes": 24,
+      "created_at": "2024-01-10T10:15:00Z",
+      "replies": []
+    },
+    {
+      "id": 5002,
+      "author": {
+        "id": 102,
+        "username": "perf_guru",
+        "display_name": "Emma Wilson"
+      },
+      "content": "Could you also cover the binary format comparison?",
+      "likes": 18,
+      "created_at": "2024-01-10T11:30:00Z",
+      "replies": [
+        {
+          "id": 5003,
+          "author": {
+            "id": 42,
+            "username": "rustacean_dev",
+            "display_name": "Sarah Chen"
+          },
+          "content": "Great idea! I'll cover that in the next article.",
+          "likes": 12,
+          "created_at": "2024-01-10T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "related_posts": [
+    {
+      "id": 998,
+      "title": "SIMD Optimization in Rust",
+      "slug": "simd-optimization-rust"
+    },
+    {
+      "id": 999,
+      "title": "Building Fast JSON Parsers",
+      "slug": "building-fast-json-parsers"
+    },
+    {
+      "id": 1002,
+      "title": "Memory Management in Rust",
+      "slug": "memory-management-rust"
+    }
+  ]
+}

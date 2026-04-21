@@ -13,6 +13,8 @@ This crate is a dependency of `fastserial` and is usually not used directly.
 fastserial = "0.1"
 ```
 
+> **Note**: Requires Rust 1.94 or later.
+
 ## Usage
 
 ```rust

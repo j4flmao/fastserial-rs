@@ -1,0 +1,46 @@
+{
+  "order_id": "ORD-2024-001234",
+  "customer": {
+    "id": 456,
+    "name": "Alice Johnson",
+    "email": "alice.j@example.com",
+    "phone": "+1-555-0123",
+    "address": {
+      "street": "123 Main Street",
+      "city": "San Francisco",
+      "state": "CA",
+      "zip": "94102",
+      "country": "USA"
+    }
+  },
+  "items": [
+    {
+      "product_id": 101,
+      "name": "Wireless Headphones",
+      "quantity": 1,
+      "unit_price": 299.99,
+      "subtotal": 299.99
+    },
+    {
+      "product_id": 102,
+      "name": "USB-C Cable",
+      "quantity": 2,
+      "unit_price": 19.99,
+      "subtotal": 39.98
+    },
+    {
+      "product_id": 103,
+      "name": "Phone Case",
+      "quantity": 1,
+      "unit_price": 29.99,
+      "subtotal": 29.99
+    }
+  ],
+  "subtotal": 369.96,
+  "tax": 32.10,
+  "shipping": 9.99,
+  "total": 412.05,
+  "status": "processing",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T14:22:00Z"
+}

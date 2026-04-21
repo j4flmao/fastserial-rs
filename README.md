@@ -23,8 +23,17 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-fastserial = "0.1.0"
+fastserial = "0.1"
 ```
+
+Or for the latest version:
+
+```toml
+[dependencies]
+fastserial = "0.1"
+```
+
+> **Note**: This library requires Rust 1.94 or later for full SIMD support (AVX2, SSE4.2).
 
 ## 🛠️ Usage
 

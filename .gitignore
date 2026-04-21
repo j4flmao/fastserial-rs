@@ -1,57 +1,24 @@
-# Build artifacts
+# Build outputs
 /target/
 **/target/
+
+# Reports
+api-bench/reports/
+sample-axum/reports/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*.sublime-project
-*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
-desktop.ini
 
 # Environment
 .env
-.env.*
-!.env.example
-
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.npm/
-.eslintcache
-
-# Husky
-.husky/_
-
-# Rust
-**/*.rs.bk
-debug/
-release/
+.env.local
 
 # Logs
 *.log
-logs/
-
-# Benchmark reports
-benchmark_results/
-criterion/
-
-# Release
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.bak

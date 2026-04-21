@@ -60,6 +60,17 @@ pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
 }
 
 #[inline]
+pub fn scan_escape_chars(input: &[u8]) -> usize {
+    match simd_level() {
+        #[cfg(target_arch = "x86_64")]
+        LEVEL_AVX2 => unsafe { avx2::scan_escape_chars(input) },
+        #[cfg(target_arch = "x86_64")]
+        LEVEL_SSE42 => unsafe { sse42::scan_escape_chars(input) },
+        _ => scalar::scan_escape_chars(input),
+    }
+}
+
+#[inline]
 pub fn skip_whitespace(input: &[u8]) -> usize {
     match simd_level() {
         #[cfg(target_arch = "x86_64")]
