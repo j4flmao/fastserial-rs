@@ -99,20 +99,20 @@ pub async fn index_handler() -> impl IntoResponse {
 pub async fn report_handler(Query(query): Query<BenchmarkQuery>) -> impl IntoResponse {
     let sample = query.sample.unwrap_or(0);
 
-    if sample > 0 {
-        if let Ok(entries) = fs::read_dir("api-bench/reports") {
-            for entry in entries.filter_map(|e| e.ok()) {
-                let path = entry.path();
-                if let Some(name) = path.file_stem() {
-                    let name_str = name.to_string_lossy();
-                    if name_str.starts_with(&format!("{}_", sample)) {
-                        if let Ok(content) = fs::read_to_string(&path) {
-                            return (
-                                [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
-                                content,
-                            );
-                        }
-                    }
+    if sample > 0
+        && let Ok(entries) = fs::read_dir("api-bench/reports")
+    {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if let Some(name) = path.file_stem() {
+                let name_str = name.to_string_lossy();
+                if name_str.starts_with(&format!("{}_", sample))
+                    && let Ok(content) = fs::read_to_string(&path)
+                {
+                    return (
+                        [(axum::http::header::CONTENT_TYPE, "text/html; charset=utf-8")],
+                        content,
+                    );
                 }
             }
         }
@@ -130,18 +130,16 @@ fn get_reports_list() -> Vec<(String, String, String)> {
     if let Ok(entries) = fs::read_dir("api-bench/reports") {
         for entry in entries.filter_map(|e| e.ok()) {
             let path = entry.path();
-            if path.extension().map(|e| e == "html").unwrap_or(false) {
-                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    if let Ok(metadata) = entry.metadata() {
-                        if let Ok(modified) = metadata.modified() {
-                            let datetime: chrono::DateTime<chrono::Local> = modified.into();
-                            let date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-                            let parts: Vec<&str> = name.split('_').collect();
-                            let sample = parts.get(0).unwrap_or(&"?").to_string();
-                            reports.push((name.to_string(), sample, date));
-                        }
-                    }
-                }
+            if path.extension().map(|e| e == "html").unwrap_or(false)
+                && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+                && let Ok(metadata) = entry.metadata()
+                && let Ok(modified) = metadata.modified()
+            {
+                let datetime: chrono::DateTime<chrono::Local> = modified.into();
+                let date = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+                let parts: Vec<&str> = name.split('_').collect();
+                let sample = parts.first().unwrap_or(&"?").to_string();
+                reports.push((name.to_string(), sample, date));
             }
         }
     }
@@ -194,12 +192,19 @@ fn generate_index_html() -> String {
         th {{ background: #667eea; color: white; }}
         .report-link {{ color: #667eea; text-decoration: none; font-weight: 600; }}
         .empty {{ text-align: center; color: #666; padding: 40px; }}
+        .legend {{ background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; justify-content: center; }}
+        .legend span {{ display: flex; align-items: center; gap: 8px; }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>FastSerial Benchmark Reports</h1>
         <p class="subtitle">Saved benchmark results</p>
+        
+        <div class="legend" style="background:white;padding:15px;border-radius:8px;margin-bottom:20px;display:flex;gap:30px;justify-content:center;">
+            <span><strong>fs</strong> = fastserial (our library)</span>
+            <span><strong>sj</strong> = serde_json (comparison)</span>
+        </div>
         
         <div class="card">
             <h3 style="margin-bottom:15px;">Run New Benchmark</h3>
@@ -358,6 +363,11 @@ fn generate_report_html(
         .speedup.positive {{ color: #11998e; }}
         .speedup.negative {{ color: #e74c3c; }}
         .chart-container {{ position: relative; height: 400px; margin: 20px 0; }}
+        .legend {{ background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; justify-content: center; }}
+        .legend span {{ display: flex; align-items: center; gap: 8px; }}
+        .legend .dot {{ width: 16px; height: 16px; border-radius: 4px; }}
+        .legend .dot.fs {{ background: #11998e; }}
+        .legend .dot.sj {{ background: #667eea; }}
     </style>
 </head>
 <body>
@@ -366,13 +376,18 @@ fn generate_report_html(
         <h1>FastSerial Benchmark Report</h1>
         <p class="subtitle">Sample: {} | Type: {}</p>
         
+        <div class="legend">
+            <span><span class="dot fs"></span> <strong>fs</strong> = fastserial (our library)</span>
+            <span><span class="dot sj"></span> <strong>sj</strong> = serde_json (comparison)</span>
+        </div>
+        
         <div class="summary">
             <div class="summary-card"><div class="value">{:.2}x</div><div class="label">Avg Encode</div></div>
             <div class="summary-card"><div class="value">{:.2}x</div><div class="label">Avg Decode</div></div>
-            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">fs encode</div></div>
-            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">sj encode</div></div>
-            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">fs decode</div></div>
-            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">sj decode</div></div>
+            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">fastserial encode</div></div>
+            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">serde_json encode</div></div>
+            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">fastserial decode</div></div>
+            <div class="summary-card"><div class="value">{:.2} ms</div><div class="label">serde_json decode</div></div>
         </div>
         
         <div class="card">
@@ -387,7 +402,19 @@ fn generate_report_html(
         
         <div class="card">
             <h2>Results</h2>
-            <table><thead><tr><th>Type</th><th>Records</th><th>fs encode</th><th>sj encode</th><th>fs decode</th><th>sj decode</th><th>Enc Speed</th><th>Dec Speed</th></tr></thead><tbody>{}</tbody></table>
+            <table>
+            <thead>
+                <tr>
+                    <th>Test Type</th>
+                    <th>Records</th>
+                    <th>fastserial encode (ms)</th>
+                    <th>serde_json encode (ms)</th>
+                    <th>fastserial decode (ms)</th>
+                    <th>serde_json decode (ms)</th>
+                    <th>Encode Speedup</th>
+                    <th>Decode Speedup</th>
+                </tr>
+            </thead><tbody>{}</tbody></table>
         </div>
     </div>
     

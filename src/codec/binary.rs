@@ -281,3 +281,201 @@ impl Format for BinaryFormat {
         }
     }
 }
+
+/// Writes null as a single 0x00 byte.
+#[inline]
+pub fn write_null(w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_null(w)
+}
+
+/// Writes bool as 0x01 (true) or 0x02 (false).
+#[inline]
+pub fn write_bool(v: bool, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_bool(v, w)
+}
+
+/// Writes u8 as a single byte.
+#[inline]
+pub fn write_u8(v: u8, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_byte(v)
+}
+
+/// Writes u16 as 2 bytes little-endian.
+#[inline]
+pub fn write_u16(v: u16, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_bytes(&v.to_le_bytes())
+}
+
+/// Writes u32 as 4 bytes little-endian.
+#[inline]
+pub fn write_u32(v: u32, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_bytes(&v.to_le_bytes())
+}
+
+/// Writes u64 as 8 bytes little-endian.
+#[inline]
+pub fn write_u64(v: u64, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_u64(v, w)
+}
+
+/// Writes i8 as a single byte.
+#[inline]
+pub fn write_i8(v: i8, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_byte(v as u8)
+}
+
+/// Writes i16 as 2 bytes little-endian.
+#[inline]
+pub fn write_i16(v: i16, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_bytes(&v.to_le_bytes())
+}
+
+/// Writes i32 as 4 bytes little-endian.
+#[inline]
+pub fn write_i32(v: i32, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_bytes(&v.to_le_bytes())
+}
+
+/// Writes i64 as 8 bytes little-endian.
+#[inline]
+pub fn write_i64(v: i64, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_i64(v, w)
+}
+
+/// Writes f32 as 4 bytes little-endian IEEE 754.
+#[inline]
+pub fn write_f32(v: f32, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    w.write_bytes(&v.to_le_bytes())
+}
+
+/// Writes f64 as 8 bytes little-endian IEEE 754.
+#[inline]
+pub fn write_f64(v: f64, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_f64(v, w)
+}
+
+/// Writes string with 4-byte length prefix + UTF-8 data.
+#[inline]
+pub fn write_str(v: &str, w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_str(v, w)
+}
+
+/// Writes bytes with 4-byte length prefix.
+#[inline]
+pub fn write_bytes(v: &[u8], w: &mut impl WriteBuffer) -> Result<(), Error> {
+    BinaryFormat::write_bytes(v, w)
+}
+
+/// Reads null (expects 0x00 byte).
+#[inline]
+pub fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
+    BinaryFormat::read_null(r)
+}
+
+/// Reads bool from non-zero byte.
+#[inline]
+pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
+    BinaryFormat::read_bool(r)
+}
+
+/// Reads u8 from a single byte.
+#[inline]
+pub fn read_u8(r: &mut ReadBuffer<'_>) -> Result<u8, Error> {
+    r.next_byte()
+}
+
+/// Reads u16 from 2 bytes little-endian.
+#[inline]
+pub fn read_u16(r: &mut ReadBuffer<'_>) -> Result<u16, Error> {
+    let bytes = r.peek_slice(2);
+    if bytes.len() < 2 {
+        return Err(Error::UnexpectedEof);
+    }
+    let v = u16::from_le_bytes([bytes[0], bytes[1]]);
+    r.advance(2);
+    Ok(v)
+}
+
+/// Reads u32 from 4 bytes little-endian.
+#[inline]
+pub fn read_u32(r: &mut ReadBuffer<'_>) -> Result<u32, Error> {
+    let bytes = r.peek_slice(4);
+    if bytes.len() < 4 {
+        return Err(Error::UnexpectedEof);
+    }
+    let v = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    r.advance(4);
+    Ok(v)
+}
+
+/// Reads u64 from 8 bytes little-endian.
+#[inline]
+pub fn read_u64(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
+    BinaryFormat::read_u64(r)
+}
+
+/// Reads i8 from a single byte.
+#[inline]
+pub fn read_i8(r: &mut ReadBuffer<'_>) -> Result<i8, Error> {
+    r.next_byte().map(|b| b as i8)
+}
+
+/// Reads i16 from 2 bytes little-endian.
+#[inline]
+pub fn read_i16(r: &mut ReadBuffer<'_>) -> Result<i16, Error> {
+    let bytes = r.peek_slice(2);
+    if bytes.len() < 2 {
+        return Err(Error::UnexpectedEof);
+    }
+    let v = i16::from_le_bytes([bytes[0], bytes[1]]);
+    r.advance(2);
+    Ok(v)
+}
+
+/// Reads i32 from 4 bytes little-endian.
+#[inline]
+pub fn read_i32(r: &mut ReadBuffer<'_>) -> Result<i32, Error> {
+    let bytes = r.peek_slice(4);
+    if bytes.len() < 4 {
+        return Err(Error::UnexpectedEof);
+    }
+    let v = i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    r.advance(4);
+    Ok(v)
+}
+
+/// Reads i64 from 8 bytes little-endian.
+#[inline]
+pub fn read_i64(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
+    BinaryFormat::read_i64(r)
+}
+
+/// Reads f32 from 4 bytes little-endian IEEE 754.
+#[inline]
+pub fn read_f32(r: &mut ReadBuffer<'_>) -> Result<f32, Error> {
+    let bytes = r.peek_slice(4);
+    if bytes.len() < 4 {
+        return Err(Error::UnexpectedEof);
+    }
+    let v = f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+    r.advance(4);
+    Ok(v)
+}
+
+/// Reads f64 from 8 bytes little-endian IEEE 754.
+#[inline]
+pub fn read_f64(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
+    BinaryFormat::read_f64(r)
+}
+
+/// Reads string from 4-byte length + UTF-8 data.
+#[inline]
+pub fn read_str<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
+    BinaryFormat::read_str(r)
+}
+
+/// Reads bytes from 4-byte length + data.
+#[inline]
+pub fn read_bytes<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
+    BinaryFormat::read_bytes(r)
+}

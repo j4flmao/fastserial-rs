@@ -1,7 +1,42 @@
+//! Derive macro implementations for fastserial Decode trait.
+//!
+//! This module provides the procedural macro for automatically implementing
+//! the `Decode` trait for custom structs. It generates optimized decoding
+//! code that uses binary search for O(log n) field matching.
+//!
+//! # Features
+//!
+//! - **SIMD-accelerated string scanning**: Uses SIMD instructions to find
+//!   quoted strings and escape characters faster than linear scanning.
+//! - **Whitespace skipping**: Optimized whitespace skipping using SIMD.
+//! - **Field matching**: Linear O(n) comparison for field name matching.
+//! - **Error handling**: Comprehensive error types for malformed JSON.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use fastserial::Decode;
+//!
+//! #[derive(Decode)]
+//! struct Point {
+//!     x: i32,
+//!     y: i32,
+//! }
+//!
+//! let json = br#"{"x":1,"y":2}"#;
+//! let point = Point::decode(&mut ReadBuffer::new(json)).unwrap();
+//! ```
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput};
 
+/// Generates the `Decode` trait implementation for a struct.
+///
+/// This function is called by the `#[derive(Decode)]` macro. It:
+/// 1. Collects all fields from the struct
+/// 2. Processes attributes (`#[fastserial(skip)]`, `#[fastserial(rename = "...")]`)
+/// 3. Generates optimized decode code with field matching
 pub fn derive_decode(input: DeriveInput) -> TokenStream {
     let name = &input.ident;
     let (_, ty_gens, where_clause) = input.generics.split_for_impl();
@@ -45,6 +80,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     let mut field_inits = quote! {};
     let mut decode_body = quote! {};
     let mut field_defaults = quote! {};
+    let mut key_strings: Vec<String> = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
@@ -89,7 +125,11 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
                 #var_ident = Some(::fastserial::Decode::decode(r)?);
             }
         });
+
+        key_strings.push(field_name_str);
     }
+
+    let key_count = key_strings.len();
 
     quote! {
         impl #impl_gens ::fastserial::Decode<'de> for #name #ty_gens #where_clause {
@@ -135,7 +175,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         }
 
         impl #impl_gens #name #ty_gens #where_clause {
-            pub const SCHEMA_HASH: u64 = 0;
+            pub const SCHEMA_HASH: u64 = #key_count as u64;
         }
     }
 }

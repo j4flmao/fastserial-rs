@@ -170,68 +170,6 @@ pub struct BlogPost {
 }
 
 #[derive(Debug, Encode, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BenchmarkResponse {
-    pub library: String,
-    pub operation: String,
-    pub sample_size: i32,
-    pub total_time_ms: f64,
-    pub avg_time_us: f64,
-    pub ops_per_sec: f64,
-    pub bytes_processed: i64,
-    pub mb_per_sec: f64,
-}
-
-impl BenchmarkResponse {
-    pub fn new(
-        library: &str,
-        operation: &str,
-        sample_size: i32,
-        total_time_ms: f64,
-        bytes: i64,
-    ) -> Self {
-        let ops = sample_size as f64;
-        let avg_us = (total_time_ms * 1000.0) / ops;
-        let ops_per_sec = if total_time_ms > 0.0 {
-            (ops * 1_000_000.0) / total_time_ms
-        } else {
-            0.0
-        };
-        let mb_per_sec = if total_time_ms > 0.0 {
-            (bytes as f64 / 1_048_576.0) * (1_000_000.0 / total_time_ms)
-        } else {
-            0.0
-        };
-        Self {
-            library: library.to_string(),
-            operation: operation.to_string(),
-            sample_size,
-            total_time_ms,
-            avg_time_us: avg_us,
-            ops_per_sec,
-            bytes_processed: bytes,
-            mb_per_sec,
-        }
-    }
-}
-
-#[derive(Debug, Encode, Clone, serde::Serialize)]
-pub struct BenchmarkResult {
-    pub fastserial_encode: BenchmarkResponse,
-    pub serde_json_encode: BenchmarkResponse,
-    pub fastserial_decode: BenchmarkResponse,
-    pub serde_json_decode: BenchmarkResponse,
-    pub speedup_encode: f64,
-    pub speedup_decode: f64,
-}
-
-#[derive(Debug, Encode, Clone, serde::Serialize)]
-pub struct ApiBenchmarkReport {
-    pub test_type: String,
-    pub json_file: String,
-    pub fastserial_result: BenchmarkResult,
-}
-
-#[derive(Debug, Encode, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BatchReport {
     pub test_type: String,
     pub sample_size: i32,

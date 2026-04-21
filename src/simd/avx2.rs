@@ -33,6 +33,11 @@ pub unsafe fn scan_quote_or_backslash(input: &[u8]) -> usize {
     i + super::scalar::scan_quote_or_backslash(&input[i..])
 }
 
+/// Scans for escape characters using AVX2 SIMD.
+///
+/// # Safety
+/// This function is unsafe because it uses AVX2 intrinsic instructions.
+/// The caller must ensure the CPU supports AVX2.
 #[target_feature(enable = "avx2")]
 #[allow(unused_unsafe)]
 pub unsafe fn scan_escape_chars(input: &[u8]) -> usize {

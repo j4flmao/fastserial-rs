@@ -21,6 +21,9 @@ pub trait WriteBuffer {
     /// Writes a slice of bytes from a pointer (unsafe, for zero-copy scenarios).
     ///
     /// Default implementation uses write_bytes.
+    ///
+    /// # Safety
+    /// The caller must ensure that `ptr` points to valid memory of at least `len` bytes.
     unsafe fn write_bytes_ptr(&mut self, ptr: *const u8, len: usize) -> Result<(), Error> {
         if len > 0 {
             let slice = unsafe { core::slice::from_raw_parts(ptr, len) };
@@ -85,7 +88,7 @@ impl WriteBuffer for &mut [u8] {
 
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Error> {
-        if (&**self).len() < bytes.len() {
+        if (**self).len() < bytes.len() {
             return Err(Error::UnexpectedEof);
         }
         self[..bytes.len()].copy_from_slice(bytes);
@@ -95,7 +98,7 @@ impl WriteBuffer for &mut [u8] {
 
     #[inline]
     fn len(&self) -> usize {
-        (&**self).len()
+        (**self).len()
     }
 }
 
@@ -108,8 +111,8 @@ impl WriteBuffer for &mut [u8] {
 /// The `'de` lifetime ensures that any data borrowed from this buffer (e.g., strings)
 /// cannot outlive the buffer itself.
 pub struct ReadBuffer<'de> {
-    pub(crate) data: &'de [u8],
-    pub(crate) pos: usize,
+    pub data: &'de [u8],
+    pub pos: usize,
 }
 
 impl<'de> ReadBuffer<'de> {
@@ -199,6 +202,9 @@ impl<'de> ReadBuffer<'de> {
     }
 
     /// Fast skip - advances without bounds check (caller must ensure valid).
+    ///
+    /// # Safety
+    /// The caller must ensure that `self.pos + n` does not exceed `self.data.len()`.
     #[inline]
     pub unsafe fn unsafe_advance(&mut self, n: usize) {
         self.pos += n;

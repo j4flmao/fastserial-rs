@@ -26,5 +26,5 @@ reqwest = "0.12"
 serde_json = "1"
 
 [[bin]]
-name = "server"
+name = "sample-server"
 path = "src/main.rs"

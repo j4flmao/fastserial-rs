@@ -32,6 +32,11 @@ pub unsafe fn scan_quote_or_backslash(input: &[u8]) -> usize {
     i + super::scalar::scan_quote_or_backslash(&input[i..])
 }
 
+/// Scans for escape characters using SSE4.2 SIMD.
+///
+/// # Safety
+/// This function is unsafe because it uses SSE4.2 intrinsic instructions.
+/// The caller must ensure the CPU supports SSE4.2.
 #[target_feature(enable = "sse4.2")]
 #[allow(unused_unsafe)]
 pub unsafe fn scan_escape_chars(input: &[u8]) -> usize {

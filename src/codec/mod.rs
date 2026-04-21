@@ -4,3 +4,6 @@ pub mod json;
 pub mod msgpack;
 
 pub use json::*;
+
+// Re-export binary primitives
+pub use binary::BinaryFormat;

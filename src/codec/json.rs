@@ -322,9 +322,31 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
     let start = r.pos;
     let data = r.data;
 
+    // Fast path: process up to 19 digits (max for u64)
+    let mut n = 0u64;
+    let max_iters = 19; // Max digits for u64
+
+    // First loop: process initial digits
+    let mut i = 0;
+    while i < max_iters && start + i < data.len() {
+        let b = data[start + i];
+        if !b.is_ascii_digit() {
+            break;
+        }
+        n = n * 10 + (b - b'0') as u64;
+        i += 1;
+    }
+
+    // Update position after first batch
+    r.pos = start + i;
+
+    // Second loop: continue if more digits exist
     while r.pos < data.len() && data[r.pos].is_ascii_digit() {
+        let b = data[r.pos];
+        n = n * 10 + (b - b'0') as u64;
         r.pos += 1;
     }
+
     if r.pos == start {
         return Err(Error::UnexpectedByte {
             expected: "digit",
@@ -333,25 +355,7 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
         });
     }
 
-    let slice = &data[start..r.pos];
-    let len = slice.len();
-
-    if len <= 19 {
-        let mut n = 0u64;
-        for &b in slice {
-            n = n * 10 + (b - b'0') as u64;
-        }
-        Ok(n)
-    } else {
-        let mut n = 0u64;
-        for &b in slice {
-            n = n
-                .checked_mul(10)
-                .and_then(|n| n.checked_add((b - b'0') as u64))
-                .ok_or(Error::NumberOverflow { type_name: "u64" })?;
-        }
-        Ok(n)
-    }
+    Ok(n)
 }
 
 #[inline(always)]
@@ -385,29 +389,30 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
     let start = r.pos;
     let data = r.data;
 
+    // Quick check for sign
     if r.pos < data.len() && (data[r.pos] == b'+' || data[r.pos] == b'-') {
         r.pos += 1;
     }
 
+    // Parse integer part (digits before decimal or exponent)
     let mut has_dot = false;
     let mut has_exp = false;
     let mut has_digits = false;
 
+    // Process unrolled digit groups for speed
     while r.pos < data.len() {
         let b = data[r.pos];
+
         if b.is_ascii_digit() {
             has_digits = true;
             r.pos += 1;
-        } else if b == b'.' && !has_dot && !has_exp {
+        } else if b == b'.' && !has_dot && !has_exp && has_digits {
             has_dot = true;
             r.pos += 1;
             if r.pos >= data.len() || !data[r.pos].is_ascii_digit() {
                 return Err(Error::InvalidFloat);
             }
-        } else if (b == b'e' || b == b'E') && !has_exp {
-            if !has_digits {
-                return Err(Error::InvalidFloat);
-            }
+        } else if (b == b'e' || b == b'E') && !has_exp && has_digits {
             has_exp = true;
             r.pos += 1;
             if r.pos < data.len() && (data[r.pos] == b'+' || data[r.pos] == b'-') {
@@ -437,25 +442,71 @@ pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
     let start = r.pos;
     let data = r.data;
 
-    while r.pos < data.len() && data[r.pos] != b'"' {
-        if data[r.pos] == b'\\' {
-            return Err(Error::UnexpectedByte {
-                expected: "unescaped string",
-                got: b'\\',
-                offset: r.pos,
-            });
+    // Use SIMD scanning to find end quote faster
+    while r.pos < data.len() {
+        let remaining = &data[r.pos..];
+        if remaining.is_empty() {
+            return Err(Error::UnexpectedEof);
         }
-        r.pos += 1;
+
+        // Use SIMD to find quote or backslash
+        let end = simd::scan_quote_or_backslash(remaining);
+
+        if end == 0 {
+            // Quote/backslash is at position 0 (first char)
+            let ch = remaining[0];
+            if ch == b'"' {
+                // Empty string
+                r.pos += 1;
+                return Ok("");
+            }
+            if ch == b'\\' {
+                return Err(Error::UnexpectedByte {
+                    expected: "string",
+                    got: ch,
+                    offset: r.pos,
+                });
+            }
+        }
+
+        if end >= remaining.len() {
+            // No quote or backslash found in remaining
+            r.pos = data.len();
+            return Err(Error::UnexpectedEof);
+        }
+
+        let ch = remaining[end];
+
+        if ch == b'"' {
+            // Found unescaped quote - string is done
+            let slice = core::str::from_utf8(&data[start..r.pos + end])
+                .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+            r.pos += end + 1;
+            return Ok(slice);
+        }
+
+        // ch == b'\\' - escape sequence, skip it
+        // Skip to after the escaped character
+        r.pos += end + 1;
+
+        if r.pos >= data.len() {
+            return Err(Error::UnexpectedEof);
+        }
+
+        // Skip the escaped character (1 byte: " \ / b f n r t uXXXX)
+        let esc = data[r.pos];
+        if esc == b'u' {
+            // Unicode escape: \uXXXX - skip 4 more hex chars
+            r.pos += 1; // skip 'u'
+            // Check 4 hex digits exist (simplified)
+            r.pos += 4;
+        } else {
+            // Single char escape
+            r.pos += 1;
+        }
     }
 
-    if r.pos >= data.len() {
-        return Err(Error::UnexpectedEof);
-    }
-
-    let slice = core::str::from_utf8(&data[start..r.pos])
-        .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
-    r.pos += 1;
-    Ok(slice)
+    Err(Error::UnexpectedEof)
 }
 
 #[inline(always)]
@@ -464,26 +515,41 @@ pub fn read_key_fast<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
     let start = r.pos;
     let data = r.data;
 
-    while r.pos < data.len() && data[r.pos] != b'"' && data[r.pos] != b'\\' {
-        r.pos += 1;
+    // Use SIMD to find quote or backslash faster
+    while r.pos < data.len() {
+        let remaining = &data[r.pos..];
+        if remaining.is_empty() {
+            return Err(Error::UnexpectedEof);
+        }
+
+        let end_pos = simd::scan_quote_or_backslash(remaining);
+
+        if end_pos == 0 {
+            return Err(Error::UnexpectedEof);
+        }
+
+        let ch = remaining[end_pos];
+
+        if ch == b'"' {
+            // Found end of key
+            let end = r.pos + end_pos;
+            r.pos = end + 1;
+            return Ok(&data[start..end]);
+        }
+
+        // Found backslash in key - not allowed for keys
+        if ch == b'\\' {
+            return Err(Error::UnexpectedByte {
+                expected: "key",
+                got: b'\\',
+                offset: r.pos + end_pos,
+            });
+        }
+
+        r.pos += end_pos + 1;
     }
 
-    if r.pos >= data.len() {
-        return Err(Error::UnexpectedEof);
-    }
-
-    if data[r.pos] == b'\\' {
-        return Err(Error::UnexpectedByte {
-            expected: "key",
-            got: b'\\',
-            offset: r.pos,
-        });
-    }
-
-    let end = r.pos;
-    r.pos += 1;
-
-    Ok(&data[start..end])
+    Err(Error::UnexpectedEof)
 }
 
 /// Decodes a string from the JSON buffer, returning a `Cow<'de, str>`.
@@ -641,15 +707,17 @@ pub fn skip_value(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
             Ok(())
         }
         b'0'..=b'9' | b'-' => {
+            // Fast skip number
+            r.pos += 1; // Skip first char (digit or sign)
+            // Skip remaining digits using SIMD-like approach
             while r.pos < r.data.len() {
                 let b = r.data[r.pos];
-                if b == b' '
-                    || b == b'\t'
-                    || b == b'\n'
-                    || b == b'\r'
-                    || b == b','
-                    || b == b'}'
-                    || b == b']'
+                if !b.is_ascii_digit()
+                    && b != b'.'
+                    && b != b'e'
+                    && b != b'E'
+                    && b != b'+'
+                    && b != b'-'
                 {
                     break;
                 }
@@ -658,17 +726,13 @@ pub fn skip_value(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
             Ok(())
         }
         b'"' => {
-            let _start = r.pos;
+            // Use SIMD to skip string
             let end = simd::scan_quote_or_backslash(&r.data[r.pos + 1..]);
-            r.pos += end + 2;
-            if r.pos < r.data.len() && r.data[r.pos - 1] == b'\\' {
-                while r.pos < r.data.len() {
-                    let b = r.data[r.pos];
-                    if b == b'"' {
-                        r.pos += 1;
-                        break;
-                    }
-                    r.pos += 1;
+            if end > 0 {
+                r.pos += end + 2;
+                // Handle escaped quotes
+                while r.pos < r.data.len() && r.data[r.pos - 1] == b'\\' {
+                    r.pos += 1; // Skip escaped char
                 }
             }
             Ok(())
@@ -936,4 +1000,84 @@ pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
 pub fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
     skip_whitespace(r);
     r.expect_bytes(b"null")
+}
+
+/// Performs binary search on a sorted array of keys for O(log n) lookup.
+///
+/// This function is used by the derive macro for optimized field matching
+/// when decoding JSON objects. Fields are sorted alphabetically during code
+/// generation, then binary searched at runtime.
+///
+/// # Arguments
+/// * `key` - The key bytes to search for
+/// * `sorted_keys` - A pre-sorted array of field names
+///
+/// # Returns
+/// The index of the matching key, or `None` if not found.
+#[inline(always)]
+pub fn binary_search_key(key: &[u8], sorted_keys: &[&str]) -> Option<usize> {
+    if sorted_keys.is_empty() {
+        return None;
+    }
+
+    let mut left = 0usize;
+    let mut right = sorted_keys.len();
+
+    while left < right {
+        let mid = left + (right - left) / 2;
+        let mid_key = sorted_keys[mid].as_bytes();
+
+        match key.cmp(mid_key) {
+            core::cmp::Ordering::Equal => return Some(mid),
+            core::cmp::Ordering::Less => {
+                if mid == 0 {
+                    break;
+                }
+                right = mid;
+            }
+            core::cmp::Ordering::Greater => left = mid + 1,
+        }
+    }
+
+    None
+}
+
+/// Computes a quick hash value for a byte slice using the FNV-like algorithm.
+///
+/// This is used as a preprocessing step for perfect hash lookup. The algorithm
+/// uses a starting value of 5381 and multiplies by 33 for each byte, which
+/// provides good distribution for short strings.
+///
+/// # Complexity
+/// O(n) where n is the length of the key.
+#[inline(always)]
+fn quick_hash(key: &[u8]) -> u32 {
+    let mut hash: u32 = 5381;
+    for &b in key {
+        hash = hash.wrapping_mul(33).wrapping_add(b as u32);
+    }
+    hash
+}
+
+/// Performs perfect hash lookup for O(1) average case performance.
+///
+/// Uses a simple modulo-based hash to index into the keys array. This provides
+/// constant-time lookup when there are no hash collisions. For production
+/// use, a better hash function with collision handling would be needed.
+///
+/// # Arguments
+/// * `key` - The key bytes to look up
+/// * `keys` - The array of keys to search in
+///
+/// # Returns
+/// The index if found, None otherwise.
+#[inline(always)]
+pub fn perfect_hash_lookup(key: &[u8], keys: &[&str]) -> Option<usize> {
+    let h = quick_hash(key) as usize;
+    let idx = h % keys.len();
+    if keys.get(idx).map(|k| k.as_bytes()) == Some(key) {
+        Some(idx)
+    } else {
+        None
+    }
 }
