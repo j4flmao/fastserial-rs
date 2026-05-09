@@ -867,12 +867,18 @@ mod vec_impl {
         #[inline]
         fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
             r.expect_byte(b'[')?;
-            let mut vec = alloc::vec::Vec::new();
             codec::json::skip_whitespace(r);
             if r.peek() == b']' {
                 r.advance(1);
-                return Ok(vec);
+                return Ok(alloc::vec::Vec::new());
             }
+
+            // Estimate the number of elements to avoid log2(N) reallocations
+            // during push(). We bound the look-ahead so that the cost stays O(N)
+            // overall and so deeply nested workloads do not blow up.
+            let est = codec::json::estimate_array_len(r.data, r.pos, 64 * 1024);
+            let mut vec = alloc::vec::Vec::with_capacity(est.clamp(4, 4096));
+
             loop {
                 vec.push(T::decode(r)?);
                 codec::json::skip_comma_or_close(r, b']')?;
@@ -960,7 +966,7 @@ impl Encode for alloc::string::String {
 impl<'de> Decode<'de> for alloc::string::String {
     #[inline]
     fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
-        Ok(codec::json::read_string_cow(r)?.into_owned())
+        codec::json::read_string_owned(r)
     }
 }
 
