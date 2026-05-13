@@ -378,6 +378,12 @@ fn parse_8_digits_swar(chunk: u64) -> (u64, u32) {
     (chunk & 0xFFFF_FFFF, 8)
 }
 
+/// Reads an unsigned 64-bit decimal integer from the JSON buffer.
+///
+/// Uses a SWAR fast-path that parses 8 ASCII digits per cycle, then falls back
+/// to a scalar tail. Each accumulator step is `checked_mul` / `checked_add`,
+/// so any input that exceeds `u64::MAX` (e.g. an attacker sending a 25-digit
+/// number) returns `Error::NumberOverflow` instead of silently wrapping.
 #[inline(always)]
 pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
     skip_whitespace(r);
@@ -392,12 +398,18 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
         let chunk = u64::from_le_bytes(unsafe { *(data.as_ptr().add(pos) as *const [u8; 8]) });
         let (val, count) = parse_8_digits_swar(chunk);
         if count == 8 {
-            // Possible overflow check would go here for very long inputs.
-            n = n.wrapping_mul(100_000_000).wrapping_add(val);
+            n = n
+                .checked_mul(100_000_000)
+                .and_then(|v| v.checked_add(val))
+                .ok_or(Error::NumberOverflow { type_name: "u64" })?;
             pos += 8;
         } else {
             for _ in 0..count {
-                n = n * 10 + (data[pos] - b'0') as u64;
+                let digit = (data[pos] - b'0') as u64;
+                n = n
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add(digit))
+                    .ok_or(Error::NumberOverflow { type_name: "u64" })?;
                 pos += 1;
             }
             r.pos = pos;
@@ -418,7 +430,11 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
         if !b.is_ascii_digit() {
             break;
         }
-        n = n * 10 + (b - b'0') as u64;
+        let digit = (b - b'0') as u64;
+        n = n
+            .checked_mul(10)
+            .and_then(|v| v.checked_add(digit))
+            .ok_or(Error::NumberOverflow { type_name: "u64" })?;
         pos += 1;
     }
     r.pos = pos;
@@ -512,77 +528,47 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
     slice.parse::<f64>().map_err(|_| Error::InvalidFloat)
 }
 
+/// Reads a JSON string, returning a zero-copy `&'de str` borrowed from the input.
+///
+/// This function is **only** safe to use when the underlying string contains no
+/// escape sequences (no `\"`, `\\`, `\n`, `\uXXXX`, …). If an escape is found,
+/// it returns [`Error::EscapeInBorrowedString`] so the caller can fall back to
+/// an owned [`String`] / [`Cow<str>`] decode.
+///
+/// # Why not unescape silently?
+///
+/// Returning a `&'de str` means the bytes must already exist contiguously in
+/// the input buffer. An escaped string like `"a\"b"` decodes to the 3-byte
+/// value `a"b`, which is **not** a sub-slice of the input — the input
+/// literally contains `a\"b` (4 bytes). Pretending to "borrow" while silently
+/// keeping the literal escape was a correctness bug present before v0.2.
 #[inline(always)]
 pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
     r.expect_byte(b'"')?;
     let start = r.pos;
     let data = r.data;
 
-    // Use SIMD scanning to find end quote faster
-    while r.pos < data.len() {
-        let remaining = &data[r.pos..];
-        if remaining.is_empty() {
-            return Err(Error::UnexpectedEof);
-        }
-
-        // Use SIMD to find quote or backslash
-        let end = simd::scan_quote_or_backslash(remaining);
-
-        if end == 0 {
-            // Quote/backslash is at position 0 (first char)
-            let ch = remaining[0];
-            if ch == b'"' {
-                // Empty string
-                r.pos += 1;
-                return Ok("");
-            }
-            if ch == b'\\' {
-                return Err(Error::UnexpectedByte {
-                    expected: "string",
-                    got: ch,
-                    offset: r.pos,
-                });
-            }
-        }
-
-        if end >= remaining.len() {
-            // No quote or backslash found in remaining
-            r.pos = data.len();
-            return Err(Error::UnexpectedEof);
-        }
-
-        let ch = remaining[end];
-
-        if ch == b'"' {
-            // Found unescaped quote - string is done
-            let slice = core::str::from_utf8(&data[start..r.pos + end])
-                .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
-            r.pos += end + 1;
-            return Ok(slice);
-        }
-
-        // ch == b'\\' - escape sequence, skip it
-        // Skip to after the escaped character
-        r.pos += end + 1;
-
-        if r.pos >= data.len() {
-            return Err(Error::UnexpectedEof);
-        }
-
-        // Skip the escaped character (1 byte: " \ / b f n r t uXXXX)
-        let esc = data[r.pos];
-        if esc == b'u' {
-            // Unicode escape: \uXXXX - skip 4 more hex chars
-            r.pos += 1; // skip 'u'
-            // Check 4 hex digits exist (simplified)
-            r.pos += 4;
-        } else {
-            // Single char escape
-            r.pos += 1;
-        }
+    let end = simd::scan_quote_or_backslash(&data[r.pos..]);
+    let abs = r.pos + end;
+    if abs >= data.len() {
+        r.pos = data.len();
+        return Err(Error::UnexpectedEof);
     }
 
-    Err(Error::UnexpectedEof)
+    match data[abs] {
+        b'"' => {
+            let slice = core::str::from_utf8(&data[start..abs])
+                .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+            r.pos = abs + 1;
+            Ok(slice)
+        }
+        b'\\' => Err(Error::EscapeInBorrowedString { offset: abs }),
+        other => Err(Error::UnexpectedByte {
+            expected: "string body or terminator",
+            got: other,
+            offset: abs,
+        }),
+    }
 }
 
 #[inline(always)]
@@ -798,106 +784,104 @@ pub fn read_bytes_impl<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error>
     Ok(result)
 }
 
+/// Skips a single JSON value (any kind) starting at the current read position.
+///
+/// Used by the derive macro when an unknown field is encountered. Correctly
+/// handles escape sequences inside strings — including the tricky cases
+/// `"\\\""` (escaped backslash followed by quote terminator) and
+/// `"\\\\\""` — by tracking backslash parity instead of looking at a single
+/// previous byte.
 #[inline(always)]
 pub fn skip_value(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
     skip_whitespace(r);
-    let b = r.peek();
-    match b {
-        b'n' => {
-            r.advance(4);
-            Ok(())
-        }
-        b't' => {
-            r.advance(4);
-            Ok(())
-        }
-        b'f' => {
-            r.advance(5);
-            Ok(())
-        }
+    match r.peek() {
+        b'n' => r.expect_bytes(b"null"),
+        b't' => r.expect_bytes(b"true"),
+        b'f' => r.expect_bytes(b"false"),
         b'0'..=b'9' | b'-' => {
-            // Fast skip number
-            r.pos += 1; // Skip first char (digit or sign)
-            // Skip remaining digits using SIMD-like approach
+            r.pos += 1;
             while r.pos < r.data.len() {
-                let b = r.data[r.pos];
-                if !b.is_ascii_digit()
-                    && b != b'.'
-                    && b != b'e'
-                    && b != b'E'
-                    && b != b'+'
-                    && b != b'-'
-                {
+                let c = r.data[r.pos];
+                if !matches!(c, b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-') {
                     break;
                 }
                 r.pos += 1;
             }
             Ok(())
         }
-        b'"' => {
-            // Use SIMD to skip string
-            let end = simd::scan_quote_or_backslash(&r.data[r.pos + 1..]);
-            if end > 0 {
-                r.pos += end + 2;
-                // Handle escaped quotes
-                while r.pos < r.data.len() && r.data[r.pos - 1] == b'\\' {
-                    r.pos += 1; // Skip escaped char
-                }
-            }
-            Ok(())
-        }
-        b'[' => {
-            r.advance(1);
-            let mut depth = 1;
-            while depth > 0 && r.pos < r.data.len() {
-                let b = r.data[r.pos];
-                if b == b'[' {
-                    depth += 1;
-                } else if b == b']' {
-                    depth -= 1;
-                } else if b == b'"' {
-                    let end = simd::scan_quote_or_backslash(&r.data[r.pos + 1..]);
-                    r.pos += end + 2;
-                    if r.pos > 0 && r.data[r.pos - 1] == b'\\' {
-                        while r.pos < r.data.len() && r.data[r.pos] != b'"' {
-                            r.pos += 1;
-                        }
-                    }
-                    continue;
-                }
-                r.pos += 1;
-            }
-            Ok(())
-        }
-        b'{' => {
-            r.advance(1);
-            let mut depth = 1;
-            while depth > 0 && r.pos < r.data.len() {
-                let b = r.data[r.pos];
-                if b == b'{' {
-                    depth += 1;
-                } else if b == b'}' {
-                    depth -= 1;
-                } else if b == b'"' {
-                    let end = simd::scan_quote_or_backslash(&r.data[r.pos + 1..]);
-                    r.pos += end + 2;
-                    if r.pos > 0 && r.data[r.pos - 1] == b'\\' {
-                        while r.pos < r.data.len() && r.data[r.pos] != b'"' {
-                            r.pos += 1;
-                        }
-                    }
-                    continue;
-                }
-                r.pos += 1;
-            }
-            Ok(())
-        }
-        _ => Err(Error::UnexpectedByte {
+        b'"' => skip_string(r),
+        b'[' => skip_container(r, b'[', b']'),
+        b'{' => skip_container(r, b'{', b'}'),
+        b => Err(Error::UnexpectedByte {
             expected: "value",
             got: b,
             offset: r.pos,
         }),
     }
+}
+
+/// Skips a JSON string starting at the opening `"`. On return, `r.pos` is
+/// positioned just past the closing `"`.
+#[inline(always)]
+fn skip_string(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
+    debug_assert_eq!(r.peek(), b'"');
+    r.pos += 1; // opening quote
+    loop {
+        let rem = &r.data[r.pos..];
+        let n = simd::scan_quote_or_backslash(rem);
+        if n >= rem.len() {
+            return Err(Error::UnexpectedEof);
+        }
+        r.pos += n;
+        match r.data[r.pos] {
+            b'"' => {
+                r.pos += 1;
+                return Ok(());
+            }
+            b'\\' => {
+                // Skip the backslash + escaped character. `\uXXXX` is 5 trailing
+                // bytes, anything else is 1.
+                if r.pos + 1 >= r.data.len() {
+                    return Err(Error::UnexpectedEof);
+                }
+                if r.data[r.pos + 1] == b'u' {
+                    if r.pos + 6 > r.data.len() {
+                        return Err(Error::UnexpectedEof);
+                    }
+                    r.pos += 6;
+                } else {
+                    r.pos += 2;
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+/// Skips a JSON container (`[...]` or `{...}`) by tracking depth.
+#[inline(always)]
+fn skip_container(r: &mut ReadBuffer<'_>, open: u8, close: u8) -> Result<(), Error> {
+    debug_assert_eq!(r.peek(), open);
+    r.pos += 1;
+    let mut depth: u32 = 1;
+    while depth > 0 {
+        if r.pos >= r.data.len() {
+            return Err(Error::UnexpectedEof);
+        }
+        let b = r.data[r.pos];
+        if b == open {
+            depth += 1;
+            r.pos += 1;
+        } else if b == close {
+            depth -= 1;
+            r.pos += 1;
+        } else if b == b'"' {
+            skip_string(r)?;
+        } else {
+            r.pos += 1;
+        }
+    }
+    Ok(())
 }
 
 #[inline]

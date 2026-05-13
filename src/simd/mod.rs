@@ -49,10 +49,7 @@ fn detect_level() -> u8 {
 }
 
 /// Fallback for x86_64 without std (no runtime cpuid possible) and other archs.
-#[cfg(not(any(
-    all(target_arch = "x86_64", feature = "std"),
-    target_arch = "aarch64"
-)))]
+#[cfg(not(any(all(target_arch = "x86_64", feature = "std"), target_arch = "aarch64")))]
 fn detect_level() -> u8 {
     LEVEL_SCALAR
 }
