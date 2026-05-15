@@ -125,6 +125,10 @@ pub mod schema;
 /// SIMD-accelerated low-level operations.
 pub mod simd;
 
+/// A small chunked bump arena (gated behind `feature = "arena"`).
+#[cfg(feature = "arena")]
+pub mod arena;
+
 mod error;
 mod format;
 pub mod value;
