@@ -21,6 +21,22 @@ homepage    = "https://github.com/j4flmao/fastserial-rs"
 keywords    = ["serialization", "zero-copy", "simd", "performance", "no_std"]
 categories  = ["encoding", "no-std", "parsing", "wasm"]
 readme      = "README.md"
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs/**/*",
+]
+
+# Metadata for docs.rs — build with every public feature so the rendered
+# documentation on https://docs.rs/fastserial mirrors what users see when
+# they enable `chrono`, `serde-compat`, `arena`, etc.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
 [lib]
 name = "fastserial"

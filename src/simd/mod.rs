@@ -1,5 +1,7 @@
 #[cfg(target_arch = "x86_64")]
 pub mod avx2;
+#[cfg(target_arch = "aarch64")]
+pub mod neon;
 pub mod scalar;
 #[cfg(target_arch = "x86_64")]
 pub mod sse42;
@@ -10,6 +12,8 @@ const LEVEL_UNKNOWN: u8 = 0;
 const LEVEL_SCALAR: u8 = 1;
 const LEVEL_SSE42: u8 = 2;
 const LEVEL_AVX2: u8 = 3;
+#[cfg(target_arch = "aarch64")]
+const LEVEL_NEON: u8 = 4;
 
 static SIMD_LEVEL: AtomicU8 = AtomicU8::new(LEVEL_UNKNOWN);
 
@@ -26,9 +30,8 @@ fn simd_level() -> u8 {
 
 /// Detects the highest available SIMD instruction set on the current CPU.
 ///
-/// Returns a level constant (LEVEL_SCALAR, LEVEL_SSE42, or LEVEL_AVX2).
-#[cfg(target_arch = "x86_64")]
-#[cfg(feature = "std")]
+/// Returns a level constant (LEVEL_SCALAR, LEVEL_SSE42, LEVEL_AVX2, or LEVEL_NEON).
+#[cfg(all(target_arch = "x86_64", feature = "std"))]
 fn detect_level() -> u8 {
     if std::arch::is_x86_feature_detected!("avx2") {
         return LEVEL_AVX2;
@@ -39,11 +42,14 @@ fn detect_level() -> u8 {
     LEVEL_SCALAR
 }
 
-/// Fallback detection for non-x86 platforms or no-std environments.
-///
-/// Always returns LEVEL_SCALAR as specialized SIMD implementations are
-/// currently only available for x86_64.
-#[cfg(not(all(target_arch = "x86_64", feature = "std")))]
+/// On AArch64, NEON is part of the baseline ABI, so it's always available.
+#[cfg(target_arch = "aarch64")]
+fn detect_level() -> u8 {
+    LEVEL_NEON
+}
+
+/// Fallback for x86_64 without std (no runtime cpuid possible) and other archs.
+#[cfg(not(any(all(target_arch = "x86_64", feature = "std"), target_arch = "aarch64")))]
 fn detect_level() -> u8 {
     LEVEL_SCALAR
 }
@@ -55,6 +61,8 @@ pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
         LEVEL_AVX2 => unsafe { avx2::scan_quote_or_backslash(input) },
         #[cfg(target_arch = "x86_64")]
         LEVEL_SSE42 => unsafe { sse42::scan_quote_or_backslash(input) },
+        #[cfg(target_arch = "aarch64")]
+        LEVEL_NEON => unsafe { neon::scan_quote_or_backslash(input) },
         _ => scalar::scan_quote_or_backslash(input),
     }
 }
@@ -66,6 +74,8 @@ pub fn scan_escape_chars(input: &[u8]) -> usize {
         LEVEL_AVX2 => unsafe { avx2::scan_escape_chars(input) },
         #[cfg(target_arch = "x86_64")]
         LEVEL_SSE42 => unsafe { sse42::scan_escape_chars(input) },
+        #[cfg(target_arch = "aarch64")]
+        LEVEL_NEON => unsafe { neon::scan_escape_chars(input) },
         _ => scalar::scan_escape_chars(input),
     }
 }
@@ -77,6 +87,8 @@ pub fn skip_whitespace(input: &[u8]) -> usize {
         LEVEL_AVX2 => unsafe { avx2::skip_whitespace(input) },
         #[cfg(target_arch = "x86_64")]
         LEVEL_SSE42 => unsafe { sse42::skip_whitespace(input) },
+        #[cfg(target_arch = "aarch64")]
+        LEVEL_NEON => unsafe { neon::skip_whitespace(input) },
         _ => scalar::skip_whitespace(input),
     }
 }
@@ -88,6 +100,8 @@ pub fn is_all_ascii(input: &[u8]) -> bool {
         LEVEL_AVX2 => unsafe { avx2::is_all_ascii(input) },
         #[cfg(target_arch = "x86_64")]
         LEVEL_SSE42 => unsafe { sse42::is_all_ascii(input) },
+        #[cfg(target_arch = "aarch64")]
+        LEVEL_NEON => unsafe { neon::is_all_ascii(input) },
         _ => scalar::is_all_ascii(input),
     }
 }

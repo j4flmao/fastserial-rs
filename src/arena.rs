@@ -1,87 +1,175 @@
+//! # Arena allocator
+//!
+//! A small chunked bump arena, modelled after `bumpalo`. Memory is allocated
+//! in append-only chunks; once a value is placed inside the arena, its
+//! address is stable for the lifetime of the arena (the arena never moves
+//! existing memory). Only `reset()` or `Drop` invalidates references.
+//!
+//! ## Why a custom one?
+//!
+//! The previous implementation stored bytes inside a `Vec<u8>` and handed
+//! out raw pointers. As soon as a later allocation grew the `Vec`, every
+//! pointer handed out before the realloc became dangling — observable
+//! undefined behaviour. This rewrite uses an append-only list of fixed
+//! `Box<[MaybeUninit<u8>]>` chunks so reallocation is impossible.
+
 #![cfg(feature = "arena")]
 #![doc(hidden)]
 
+use alloc::alloc::Layout;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::alloc::Layout;
-use core::mem;
-use core::ptr;
+use core::cell::Cell;
+use core::mem::{self, MaybeUninit};
+use core::ptr::{self, NonNull};
 
-pub struct Arena {
-    memory: Vec<u8>,
-    used: usize,
+const DEFAULT_CHUNK_SIZE: usize = 4096;
+
+struct Chunk {
+    data: Box<[MaybeUninit<u8>]>,
+    /// Offset into `data` of the next free byte.
+    used: Cell<usize>,
 }
 
-impl Arena {
-    #[inline]
-    pub fn with_capacity(size: usize) -> Self {
+impl Chunk {
+    fn with_capacity(cap: usize) -> Self {
+        let mut v = Vec::with_capacity(cap);
+        // Safety: we never read uninitialised bytes through `&[u8]`; the
+        // arena tracks initialised bytes via the `used` cursor and the
+        // typed pointers handed out by `alloc`.
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+            v.set_len(cap);
+        }
         Self {
-            memory: Vec::with_capacity(size),
-            used: 0,
+            data: v.into_boxed_slice(),
+            used: Cell::new(0),
         }
     }
 
-    #[inline]
-    pub fn new() -> Self {
-        Self::with_capacity(4096)
+    fn try_alloc(&self, layout: Layout) -> Option<NonNull<u8>> {
+        let used = self.used.get();
+        let base = self.data.as_ptr() as usize;
+        let cur = base + used;
+        let aligned = (cur + layout.align() - 1) & !(layout.align() - 1);
+        let pad = aligned - cur;
+        let new_used = used.checked_add(pad)?.checked_add(layout.size())?;
+        if new_used > self.data.len() {
+            return None;
+        }
+        self.used.set(new_used);
+        // Safety: aligned ∈ [base + used, base + len], so it points inside
+        // the chunk and is non-null because `data` is allocated.
+        Some(unsafe { NonNull::new_unchecked(aligned as *mut u8) })
     }
 
+    fn reset(&mut self) {
+        self.used.set(0);
+    }
+
+    fn capacity(&self) -> usize {
+        self.data.len()
+    }
+}
+
+/// A chunked bump arena.
+///
+/// Allocations are O(1) amortised. The arena never moves bytes once written,
+/// so references handed out by [`Arena::alloc`] / [`Arena::alloc_slice`]
+/// stay valid until [`Arena::reset`] is called or the arena is dropped.
+pub struct Arena {
+    /// All chunks except the current one. Older chunks may have wasted tail
+    /// space, but they own live data and must not be reset until the arena
+    /// itself is reset.
+    chunks: Vec<Chunk>,
+    /// Active chunk we try to allocate from first.
+    current: Chunk,
+}
+
+impl Arena {
+    /// Creates an arena with a single 4 KiB chunk.
+    #[inline]
+    pub fn new() -> Self {
+        Self::with_capacity(DEFAULT_CHUNK_SIZE)
+    }
+
+    /// Creates an arena with an initial chunk of the given size (rounded up
+    /// to at least the default chunk size).
+    #[inline]
+    pub fn with_capacity(cap: usize) -> Self {
+        let cap = cap.max(DEFAULT_CHUNK_SIZE);
+        Self {
+            chunks: Vec::new(),
+            current: Chunk::with_capacity(cap),
+        }
+    }
+
+    /// Allocates `val` in the arena and returns a stable mutable reference.
     #[inline]
     pub fn alloc<T>(&mut self, val: T) -> &mut T {
         let layout = Layout::for_value(&val);
-        let ptr = self.alloc_layout(layout) as *mut T;
+        let ptr = self.alloc_layout(layout).as_ptr() as *mut T;
+        // Safety: ptr came from alloc_layout with the right size and
+        // alignment for T, and we are the only writer.
         unsafe {
             ptr::write(ptr, val);
             &mut *ptr
         }
     }
 
+    /// Copies `slice` into the arena and returns a stable mutable slice.
     #[inline]
     pub fn alloc_slice<T: Copy>(&mut self, slice: &[T]) -> &mut [T] {
-        let layout = Layout::array::<T>(slice.len()).unwrap();
-        let ptr = self.alloc_layout(layout) as *mut T;
+        let layout = Layout::array::<T>(slice.len()).expect("layout overflow");
+        let ptr = self.alloc_layout(layout).as_ptr() as *mut T;
+        // Safety: layout fits exactly `slice.len()` Ts, and source is non-overlapping.
         unsafe {
             ptr::copy_nonoverlapping(slice.as_ptr(), ptr, slice.len());
             core::slice::from_raw_parts_mut(ptr, slice.len())
         }
     }
 
-    #[inline]
-    fn alloc_layout(&mut self, layout: Layout) -> *mut u8 {
-        let align = layout.align();
-        let size = layout.size();
-
-        let misalignment = self.used % align;
-        let padding = if misalignment == 0 {
-            0
-        } else {
-            align - misalignment
-        };
-        let start = self.used + padding;
-
-        let new_used = start + size;
-        if new_used > self.memory.capacity() {
-            let additional = size.max(4096);
-            self.memory.reserve(additional);
+    fn alloc_layout(&mut self, layout: Layout) -> NonNull<u8> {
+        if let Some(p) = self.current.try_alloc(layout) {
+            return p;
         }
-
-        let ptr = unsafe { self.memory.as_mut_ptr().add(start) };
-        self.used = new_used;
-        ptr
+        // Need a new chunk: at least double the previous size, but enough
+        // to fit `layout` even if it's larger than DEFAULT_CHUNK_SIZE.
+        let new_cap = (self.current.capacity() * 2)
+            .max(layout.size() + layout.align())
+            .max(DEFAULT_CHUNK_SIZE);
+        let new_chunk = Chunk::with_capacity(new_cap);
+        // Move current into the saved list, install the new chunk.
+        let old = mem::replace(&mut self.current, new_chunk);
+        self.chunks.push(old);
+        // Allocation in a fresh chunk cannot fail unless layout itself is bogus.
+        self.current
+            .try_alloc(layout)
+            .expect("fresh chunk should always satisfy a single allocation")
     }
 
-    #[inline]
+    /// Drops all chunks except the largest, which is reused. Invalidates
+    /// every reference previously handed out.
     pub fn reset(&mut self) {
-        self.used = 0;
+        // Pick the biggest chunk to keep; drop the rest.
+        let mut keep = mem::replace(&mut self.current, Chunk::with_capacity(DEFAULT_CHUNK_SIZE));
+        for c in self.chunks.drain(..) {
+            if c.capacity() > keep.capacity() {
+                keep = c;
+            }
+        }
+        keep.reset();
+        self.current = keep;
     }
 
-    #[inline]
+    /// Total bytes used across all chunks, including alignment padding.
     pub fn used_bytes(&self) -> usize {
-        self.used
+        self.current.used.get() + self.chunks.iter().map(|c| c.used.get()).sum::<usize>()
     }
 
-    #[inline]
+    /// Total capacity across all chunks.
     pub fn capacity(&self) -> usize {
-        self.memory.capacity()
+        self.current.capacity() + self.chunks.iter().map(|c| c.capacity()).sum::<usize>()
     }
 }
 
@@ -96,24 +184,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_arena_alloc() {
-        let mut arena = Arena::with_capacity(1024);
-        let val = arena.alloc(42u32);
-        assert_eq!(*val, 42);
+    fn alloc_returns_correct_value() {
+        let mut a = Arena::new();
+        assert_eq!(*a.alloc(42u32), 42);
     }
 
     #[test]
-    fn test_arena_alloc_slice() {
-        let mut arena = Arena::with_capacity(1024);
-        let slice = arena.alloc_slice(&[1u32, 2, 3, 4, 5]);
-        assert_eq!(slice, &[1, 2, 3, 4, 5]);
+    fn alloc_slice_copies() {
+        let mut a = Arena::new();
+        let s = a.alloc_slice(&[1u32, 2, 3, 4, 5]);
+        assert_eq!(s, &[1, 2, 3, 4, 5]);
     }
 
     #[test]
-    fn test_arena_reset() {
-        let mut arena = Arena::with_capacity(1024);
-        arena.alloc(42u32);
-        arena.reset();
-        assert_eq!(arena.used_bytes(), 0);
+    fn many_allocations_stay_alive_across_chunk_growth() {
+        // The pre-fix arena would invalidate previously-returned addresses
+        // as soon as the backing Vec grew (it called `Vec::reserve` and then
+        // handed out a raw pointer). The new arena uses an append-only chunk
+        // list, so each chunk's bytes live until reset. We collect the
+        // pointer of the first allocation, force many more allocations that
+        // grow into new chunks, then re-borrow the original pointer.
+        let mut a = Arena::with_capacity(64);
+        let first_ptr: *const u64 = a.alloc(0xdeadbeefu64);
+        for i in 0..1000u64 {
+            let _ = a.alloc(i);
+        }
+        // Safety: arena chunks are append-only; first_ptr was returned by
+        // alloc on the same arena and the arena has not been reset/dropped.
+        assert_eq!(unsafe { *first_ptr }, 0xdeadbeef);
+        // sanity: we did spill into more than one chunk
+        assert!(a.capacity() > 64);
+    }
+
+    #[test]
+    fn alloc_respects_alignment() {
+        let mut a = Arena::with_capacity(64);
+        // Force unaligned cursor by alloc-ing one byte first.
+        let _ = a.alloc(1u8);
+        let p: *const u64 = a.alloc(0u64);
+        assert_eq!((p as usize) % core::mem::align_of::<u64>(), 0);
+    }
+
+    #[test]
+    fn larger_than_chunk_still_allocates() {
+        let mut a = Arena::with_capacity(64);
+        let big: [u32; 1024] = core::array::from_fn(|i| i as u32);
+        let s = a.alloc_slice(&big);
+        assert_eq!(s.len(), 1024);
+        assert_eq!(s[1023], 1023);
+    }
+
+    #[test]
+    fn reset_zeroes_used_bytes() {
+        let mut a = Arena::with_capacity(64);
+        a.alloc(1u32);
+        a.alloc(2u32);
+        assert!(a.used_bytes() > 0);
+        a.reset();
+        assert_eq!(a.used_bytes(), 0);
+        // Should still be usable.
+        assert_eq!(*a.alloc(99u32), 99);
     }
 }

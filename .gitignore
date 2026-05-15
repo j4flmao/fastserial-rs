@@ -22,3 +22,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local commit-message scratch files used by tooling
+.commit_msg.tmp

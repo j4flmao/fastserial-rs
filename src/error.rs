@@ -52,8 +52,22 @@ pub enum Error {
     },
     /// Extra data found after decoding the main value.
     TrailingData,
+    /// A schema hash mismatch was detected during binary decoding.
+    SchemaMismatch {
+        /// The schema hash expected by the target type.
+        expected: u64,
+        /// The schema hash found in the input data.
+        got: u64,
+    },
+    /// A borrowed string contained an escape sequence — borrowing would
+    /// require allocating an unescaped copy. Use `String` or `Cow<str>` instead.
+    EscapeInBorrowedString {
+        /// Byte offset of the escape sequence.
+        offset: usize,
+    },
     /// A custom error from an external source.
-    Custom(alloc::boxed::Box<dyn std::error::Error + Send + Sync>),
+    #[cfg(feature = "std")]
+    Custom(alloc::boxed::Box<dyn core::error::Error + Send + Sync>),
 }
 
 impl fmt::Debug for Error {
@@ -96,7 +110,18 @@ impl fmt::Debug for Error {
                 write!(f, "Unsupported binary version: {:#06x}", version)
             }
             Self::TrailingData => write!(f, "Extra data found after decoding the main value"),
-            Self::Custom(_) => write!(f, "Custom error"),
+            Self::SchemaMismatch { expected, got } => write!(
+                f,
+                "Schema hash mismatch: expected {:#018x}, got {:#018x}",
+                expected, got
+            ),
+            Self::EscapeInBorrowedString { offset } => write!(
+                f,
+                "Borrowed &str cannot contain escape sequences (at offset {}); use String or Cow<str>",
+                offset
+            ),
+            #[cfg(feature = "std")]
+            Self::Custom(e) => write!(f, "Custom error: {}", e),
         }
     }
 }

@@ -78,9 +78,10 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     };
 
     let mut field_inits = quote! {};
-    let mut decode_body = quote! {};
     let mut field_defaults = quote! {};
     let mut key_strings: Vec<String> = Vec::new();
+    // (length, field_name_str, var_ident) for length-bucketed dispatch.
+    let mut active_fields: Vec<(usize, String, syn::Ident)> = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
@@ -120,16 +121,87 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
             #field_name: #var_ident.ok_or(::fastserial::Error::MissingField { name: #field_name_str })?,
         });
 
-        decode_body.extend(quote! {
-            bs if bs == #field_name_str.as_bytes() => {
-                #var_ident = Some(::fastserial::Decode::decode(r)?);
-            }
-        });
-
+        active_fields.push((field_name_str.len(), field_name_str.clone(), var_ident));
         key_strings.push(field_name_str);
     }
 
     let key_count = key_strings.len();
+
+    // Build a length-bucketed dispatcher:
+    //
+    //     match key.len() {
+    //         3 => match key { b"foo" => ..., b"bar" => ..., _ => skip }
+    //         5 => match key { b"hello" => ..., _ => skip }
+    //         _ => skip,
+    //     }
+    //
+    // This is dramatically faster than the previous match-with-guards approach
+    // because (a) the outer length switch is a single integer compare, and (b)
+    // the inner arms become byte-array literal patterns that LLVM can lower to
+    // an integer compare instead of a `memcmp` call.
+    let mut buckets: std::collections::BTreeMap<usize, Vec<(String, syn::Ident)>> =
+        std::collections::BTreeMap::new();
+    for (len, name, var) in &active_fields {
+        buckets
+            .entry(*len)
+            .or_default()
+            .push((name.clone(), var.clone()));
+    }
+
+    let mut decode_body = quote! {};
+    for (len, entries) in &buckets {
+        let len_lit = proc_macro2::Literal::usize_unsuffixed(*len);
+
+        if entries.len() <= 3 {
+            // Linear match for small buckets (≤3 same-length fields).
+            // Byte-literal patterns (b"foo") are compiled to integer compares
+            // by LLVM — no memcmp call, extremely fast.
+            let mut inner = quote! {};
+            for (name, var) in entries {
+                let lit = syn::LitByteStr::new(name.as_bytes(), proc_macro2::Span::call_site());
+                inner.extend(quote! {
+                    #lit => {
+                        #var = Some(::fastserial::Decode::decode(r)?);
+                    }
+                });
+            }
+            decode_body.extend(quote! {
+                #len_lit => match key_bytes {
+                    #inner
+                    _ => { ::fastserial::codec::json::skip_value(r)?; }
+                },
+            });
+        } else {
+            // Binary search for large buckets (>3 same-length fields).
+            // Sorting ensures O(log n) comparisons instead of O(n).
+            let mut sorted_entries = entries.clone();
+            sorted_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+
+            let sorted_names: Vec<&str> = sorted_entries
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect();
+
+            let mut binary_arms = quote! {};
+            for (idx, (_, var)) in sorted_entries.iter().enumerate() {
+                binary_arms.extend(quote! {
+                    Some(#idx) => {
+                        #var = Some(::fastserial::Decode::decode(r)?);
+                    }
+                });
+            }
+
+            decode_body.extend(quote! {
+                #len_lit => {
+                    let bucket_keys = &[#(#sorted_names),*];
+                    match ::fastserial::codec::json::binary_search_key(key_bytes, bucket_keys) {
+                        #binary_arms
+                        _ => { ::fastserial::codec::json::skip_value(r)?; }
+                    }
+                },
+            });
+        }
+    }
 
     quote! {
         impl #impl_gens ::fastserial::Decode<'de> for #name #ty_gens #where_clause {
@@ -160,7 +232,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
                     r.expect_byte(b':')?;
                     ::fastserial::codec::json::skip_whitespace(r);
 
-                    match key_bytes {
+                    match key_bytes.len() {
                         #decode_body
                         _ => {
                             ::fastserial::codec::json::skip_value(r)?;

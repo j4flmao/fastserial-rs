@@ -79,20 +79,26 @@ impl WriteBuffer for &mut [u8] {
     #[inline]
     fn write_byte(&mut self, b: u8) -> Result<(), Error> {
         if self.is_empty() {
-            return Err(Error::UnexpectedEof);
+            return Err(Error::BufferFull {
+                needed: 1,
+                available: 0,
+            });
         }
         self[0] = b;
-        *self = &mut std::mem::take(self)[1..];
+        *self = &mut core::mem::take(self)[1..];
         Ok(())
     }
 
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Error> {
         if (**self).len() < bytes.len() {
-            return Err(Error::UnexpectedEof);
+            return Err(Error::BufferFull {
+                needed: bytes.len(),
+                available: (**self).len(),
+            });
         }
         self[..bytes.len()].copy_from_slice(bytes);
-        *self = &mut std::mem::take(self)[bytes.len()..];
+        *self = &mut core::mem::take(self)[bytes.len()..];
         Ok(())
     }
 
