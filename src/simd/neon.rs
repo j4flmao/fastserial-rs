@@ -10,16 +10,16 @@
 
 use core::arch::aarch64::*;
 
-/// Compresses a 128-bit comparison mask (16 lanes of 0x00/0xFF) into a 16-bit
-/// bitmask, one bit per lane. This is the NEON equivalent of x86's
-/// `_mm_movemask_epi8` and avoids the slow scalar-extraction pattern.
+/// Compresses a 128-bit comparison mask (16 lanes of 0x00/0xFF) into a 64-bit
+/// value where each nibble (4 bits) represents the match status of two adjacent
+/// bytes. A zero nibble means neither byte matched; non-zero means at least
+/// one matched.
 #[inline(always)]
-unsafe fn movemask_u8(mask: uint8x16_t) -> u32 {
+unsafe fn movemask_u8(mask: uint8x16_t) -> u64 {
     // shift-right-narrow: each pair of bytes (16 lanes → 8 lanes of u8)
     // collapses to a 4-bit nibble per byte. Packed result fits in 64 bits.
     let nibbles = vshrn_n_u16(vreinterpretq_u16_u8(mask), 4);
-    let bits = vget_lane_u64(vreinterpret_u64_u8(nibbles), 0);
-    bits as u32
+    vget_lane_u64(vreinterpret_u64_u8(nibbles), 0)
 }
 
 /// Scans for the first quote or backslash using NEON 128-bit instructions.
@@ -37,7 +37,6 @@ pub unsafe fn scan_quote_or_backslash(input: &[u8]) -> usize {
         let combined = vorrq_u8(vceqq_u8(wide, quote), vceqq_u8(wide, backslash));
         let mask = movemask_u8(combined);
         if mask != 0 {
-            // Each lane contributes 4 bits (nibble), so divide by 4.
             return i + (mask.trailing_zeros() as usize) / 4;
         }
         i += 16;
@@ -95,8 +94,7 @@ pub unsafe fn skip_whitespace(input: &[u8]) -> usize {
             vorrq_u8(vceqq_u8(wide, lf), vceqq_u8(wide, cr)),
         );
         let mask = movemask_u8(is_ws);
-        // movemask_u8 produces 4 bits per lane → 64 bits for 16 lanes when full.
-        if mask != u32::MAX {
+        if mask != u64::MAX {
             return i + (!mask).trailing_zeros() as usize / 4;
         }
         i += 16;

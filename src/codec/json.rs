@@ -533,7 +533,7 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
 /// This function is **only** safe to use when the underlying string contains no
 /// escape sequences (no `\"`, `\\`, `\n`, `\uXXXX`, …). If an escape is found,
 /// it returns [`Error::EscapeInBorrowedString`] so the caller can fall back to
-/// an owned [`String`] / [`Cow<str>`] decode.
+/// an owned `String` / `Cow<str>` decode.
 ///
 /// # Why not unescape silently?
 ///
