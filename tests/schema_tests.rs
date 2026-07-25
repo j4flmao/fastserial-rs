@@ -5,6 +5,7 @@ use fastserial::schema::validate::validate_field_type;
 
 #[test]
 fn test_scalar_types() {
+    let _arena = fastserial::arena::Arena::new();
     assert!(FieldType::Bool.is_scalar());
     assert!(FieldType::U8.is_scalar());
     assert!(FieldType::U16.is_scalar());
@@ -20,6 +21,7 @@ fn test_scalar_types() {
 
 #[test]
 fn test_non_scalar_types() {
+    let _arena = fastserial::arena::Arena::new();
     assert!(!FieldType::String.is_scalar());
     assert!(!FieldType::Bytes.is_scalar());
     assert!(!FieldType::Option(Box::new(FieldType::U32)).is_scalar());
@@ -31,6 +33,7 @@ fn test_non_scalar_types() {
 
 #[test]
 fn test_alignment_1_byte() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::Bool.alignment(), 1);
     assert_eq!(FieldType::U8.alignment(), 1);
     assert_eq!(FieldType::I8.alignment(), 1);
@@ -38,12 +41,14 @@ fn test_alignment_1_byte() {
 
 #[test]
 fn test_alignment_2_bytes() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::U16.alignment(), 2);
     assert_eq!(FieldType::I16.alignment(), 2);
 }
 
 #[test]
 fn test_alignment_4_bytes() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::U32.alignment(), 4);
     assert_eq!(FieldType::I32.alignment(), 4);
     assert_eq!(FieldType::F32.alignment(), 4);
@@ -51,6 +56,7 @@ fn test_alignment_4_bytes() {
 
 #[test]
 fn test_alignment_8_bytes() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::U64.alignment(), 8);
     assert_eq!(FieldType::I64.alignment(), 8);
     assert_eq!(FieldType::F64.alignment(), 8);
@@ -65,6 +71,7 @@ fn test_alignment_8_bytes() {
 
 #[test]
 fn test_size_fixed() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::Bool.size(), Some(1));
     assert_eq!(FieldType::U8.size(), Some(1));
     assert_eq!(FieldType::I8.size(), Some(1));
@@ -80,6 +87,7 @@ fn test_size_fixed() {
 
 #[test]
 fn test_size_variable() {
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(FieldType::String.size(), None);
     assert_eq!(FieldType::Bytes.size(), None);
     assert_eq!(FieldType::Option(Box::new(FieldType::U32)).size(), None);
@@ -91,6 +99,7 @@ fn test_size_variable() {
 
 #[test]
 fn test_field_type_clone() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Vec(Box::new(FieldType::Option(Box::new(FieldType::String))));
     let cloned = ft.clone();
     assert_eq!(ft, cloned);
@@ -98,6 +107,7 @@ fn test_field_type_clone() {
 
 #[test]
 fn test_field_type_ne() {
+    let _arena = fastserial::arena::Arena::new();
     assert_ne!(FieldType::U32, FieldType::I32);
     assert_ne!(FieldType::String, FieldType::Bytes);
     assert_ne!(
@@ -110,6 +120,7 @@ fn test_field_type_ne() {
 
 #[test]
 fn test_validate_scalar_types() {
+    let _arena = fastserial::arena::Arena::new();
     assert!(validate_field_type(&FieldType::Bool).is_ok());
     assert!(validate_field_type(&FieldType::U8).is_ok());
     assert!(validate_field_type(&FieldType::U16).is_ok());
@@ -125,66 +136,77 @@ fn test_validate_scalar_types() {
 
 #[test]
 fn test_validate_string_and_bytes() {
+    let _arena = fastserial::arena::Arena::new();
     assert!(validate_field_type(&FieldType::String).is_ok());
     assert!(validate_field_type(&FieldType::Bytes).is_ok());
 }
 
 #[test]
 fn test_validate_option_valid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Option(Box::new(FieldType::U32));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_nested_option_invalid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Option(Box::new(FieldType::Option(Box::new(FieldType::U32))));
     assert!(validate_field_type(&ft).is_err());
 }
 
 #[test]
 fn test_validate_vec_valid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Vec(Box::new(FieldType::String));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_vec_of_option_valid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Vec(Box::new(FieldType::Option(Box::new(FieldType::U64))));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_vec_of_vec_valid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Vec(Box::new(FieldType::Vec(Box::new(FieldType::I32))));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_struct_valid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Struct("MyStruct");
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_struct_empty_name_invalid() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Struct("");
     assert!(validate_field_type(&ft).is_err());
 }
 
 #[test]
 fn test_validate_option_of_string() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Option(Box::new(FieldType::String));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_option_of_vec() {
+    let _arena = fastserial::arena::Arena::new();
     let ft = FieldType::Option(Box::new(FieldType::Vec(Box::new(FieldType::Bool))));
     assert!(validate_field_type(&ft).is_ok());
 }
 
 #[test]
 fn test_validate_deeply_nested() {
+    let _arena = fastserial::arena::Arena::new();
     // Vec<Vec<Option<Struct>>>
     let ft = FieldType::Vec(Box::new(FieldType::Vec(Box::new(FieldType::Option(
         Box::new(FieldType::Struct("Deep")),

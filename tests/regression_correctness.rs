@@ -17,38 +17,43 @@ use fastserial::json::decode;
 
 #[test]
 fn borrowed_str_rejects_escape_quote() {
-    let input = br#""a\"b""#; // JSON for the 3-char string `a"b`
-    let result: Result<&str, Error> = decode(input);
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = br#""a\"b""#.to_vec(); // JSON for the 3-char string `a"b`
+    let result: Result<&str, Error> = decode(&mut input, &_arena);
     assert!(matches!(result, Err(Error::EscapeInBorrowedString { .. })));
 }
 
 #[test]
 fn borrowed_str_rejects_escape_backslash() {
-    let input = br#""a\\b""#;
-    let result: Result<&str, Error> = decode(input);
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = br#""a\\b""#.to_vec();
+    let result: Result<&str, Error> = decode(&mut input, &_arena);
     assert!(matches!(result, Err(Error::EscapeInBorrowedString { .. })));
 }
 
 #[test]
 fn borrowed_str_rejects_unicode_escape() {
-    let input = br#""\u0041""#;
-    let result: Result<&str, Error> = decode(input);
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = br#""\u0041""#.to_vec();
+    let result: Result<&str, Error> = decode(&mut input, &_arena);
     assert!(matches!(result, Err(Error::EscapeInBorrowedString { .. })));
 }
 
 #[test]
 fn borrowed_str_accepts_no_escape() {
-    let input = br#""hello world""#;
-    let s: &str = decode(input).unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = br#""hello world""#.to_vec();
+    let s: &str = decode(&mut input, &_arena).unwrap();
     assert_eq!(s, "hello world");
 }
 
 #[test]
 fn owned_string_unescapes_correctly() {
+    let _arena = fastserial::arena::Arena::new();
     // The owned-String path must keep working — it allocates and unescapes.
-    let s: String = decode(br#""a\"b""#).unwrap();
+    let s: String = decode(&mut br#""a\"b""#.to_vec(), &_arena).unwrap();
     assert_eq!(s, "a\"b");
-    let s: String = decode(br#""line1\nline2""#).unwrap();
+    let s: String = decode(&mut br#""line1\nline2""#.to_vec(), &_arena).unwrap();
     assert_eq!(s, "line1\nline2");
 }
 
@@ -58,9 +63,10 @@ fn owned_string_unescapes_correctly() {
 
 #[test]
 fn unsigned_overflow_errors_25_digits() {
+    let _arena = fastserial::arena::Arena::new();
     // 25-digit number > u64::MAX ≈ 1.8e19
-    let input = b"1234567890123456789012345";
-    let result: Result<u64, Error> = decode(input);
+    let mut input = b"1234567890123456789012345".to_vec();
+    let result: Result<u64, Error> = decode(&mut input, &_arena);
     assert!(matches!(
         result,
         Err(Error::NumberOverflow { type_name: "u64" })
@@ -69,9 +75,10 @@ fn unsigned_overflow_errors_25_digits() {
 
 #[test]
 fn unsigned_overflow_errors_just_above_max() {
+    let _arena = fastserial::arena::Arena::new();
     // u64::MAX = 18446744073709551615; one more than that overflows.
-    let input = b"18446744073709551616";
-    let result: Result<u64, Error> = decode(input);
+    let mut input = b"18446744073709551616".to_vec();
+    let result: Result<u64, Error> = decode(&mut input, &_arena);
     assert!(matches!(
         result,
         Err(Error::NumberOverflow { type_name: "u64" })
@@ -80,15 +87,17 @@ fn unsigned_overflow_errors_just_above_max() {
 
 #[test]
 fn unsigned_max_value_works() {
-    let v: u64 = decode(b"18446744073709551615").unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let v: u64 = decode(&mut b"18446744073709551615".to_vec(), &_arena).unwrap();
     assert_eq!(v, u64::MAX);
 }
 
 #[test]
 fn unsigned_long_zeros_no_false_overflow() {
+    let _arena = fastserial::arena::Arena::new();
     // 30 leading zeros + a value — must NOT overflow because each `* 10` of
     // zero is still zero.
-    let v: u64 = decode(b"000000000000000000000000000042").unwrap();
+    let v: u64 = decode(&mut b"000000000000000000000000000042".to_vec(), &_arena).unwrap();
     assert_eq!(v, 42);
 }
 
@@ -105,6 +114,7 @@ fn unsigned_long_zeros_no_false_overflow() {
 
 #[test]
 fn skip_value_handles_escaped_backslash_followed_by_quote() {
+    let _arena = fastserial::arena::Arena::new();
     use fastserial::{Decode, Encode};
 
     #[derive(Encode, Decode, Debug, PartialEq)]
@@ -115,13 +125,14 @@ fn skip_value_handles_escaped_backslash_followed_by_quote() {
     // The unknown "note" field's value is the 1-char string `\` (a single
     // backslash). In JSON wire form that's `"\\"` — two backslashes between
     // quotes. After skipping it we must still find `id` correctly.
-    let input = br#"{"note":"\\","id":7}"#;
-    let v: OnlyId = decode(input).unwrap();
+    let mut input = br#"{"note":"\\","id":7}"#.to_vec();
+    let v: OnlyId = decode(&mut input, &_arena).unwrap();
     assert_eq!(v, OnlyId { id: 7 });
 }
 
 #[test]
 fn skip_value_handles_unicode_escape_in_unknown_field() {
+    let _arena = fastserial::arena::Arena::new();
     use fastserial::{Decode, Encode};
 
     #[derive(Encode, Decode, Debug, PartialEq)]
@@ -129,13 +140,14 @@ fn skip_value_handles_unicode_escape_in_unknown_field() {
         id: u32,
     }
 
-    let input = br#"{"label":"\u0041BC","id":99}"#;
-    let v: OnlyId = decode(input).unwrap();
+    let mut input = br#"{"label":"\u0041BC","id":99}"#.to_vec();
+    let v: OnlyId = decode(&mut input, &_arena).unwrap();
     assert_eq!(v, OnlyId { id: 99 });
 }
 
 #[test]
 fn skip_value_handles_nested_array_with_strings() {
+    let _arena = fastserial::arena::Arena::new();
     use fastserial::{Decode, Encode};
 
     #[derive(Encode, Decode, Debug, PartialEq)]
@@ -143,7 +155,7 @@ fn skip_value_handles_nested_array_with_strings() {
         id: u32,
     }
 
-    let input = br#"{"tags":[["a\"b","c"],{"x":1}],"id":1}"#;
-    let v: OnlyId = decode(input).unwrap();
+    let mut input = br#"{"tags":[["a\"b","c"],{"x":1}],"id":1}"#.to_vec();
+    let v: OnlyId = decode(&mut input, &_arena).unwrap();
     assert_eq!(v, OnlyId { id: 1 });
 }

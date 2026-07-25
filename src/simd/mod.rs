@@ -54,8 +54,11 @@ fn detect_level() -> u8 {
     LEVEL_SCALAR
 }
 
-#[inline]
+#[inline(always)]
 pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
+    if input.len() < 32 {
+        return scalar::scan_quote_or_backslash(input);
+    }
     match simd_level() {
         #[cfg(target_arch = "x86_64")]
         LEVEL_AVX2 => unsafe { avx2::scan_quote_or_backslash(input) },
@@ -67,8 +70,11 @@ pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn scan_escape_chars(input: &[u8]) -> usize {
+    if input.len() < 32 {
+        return scalar::scan_escape_chars(input);
+    }
     match simd_level() {
         #[cfg(target_arch = "x86_64")]
         LEVEL_AVX2 => unsafe { avx2::scan_escape_chars(input) },
@@ -80,8 +86,11 @@ pub fn scan_escape_chars(input: &[u8]) -> usize {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn skip_whitespace(input: &[u8]) -> usize {
+    if input.len() < 32 {
+        return scalar::skip_whitespace(input);
+    }
     match simd_level() {
         #[cfg(target_arch = "x86_64")]
         LEVEL_AVX2 => unsafe { avx2::skip_whitespace(input) },
@@ -93,8 +102,11 @@ pub fn skip_whitespace(input: &[u8]) -> usize {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn is_all_ascii(input: &[u8]) -> bool {
+    if input.len() < 32 {
+        return scalar::is_all_ascii(input);
+    }
     match simd_level() {
         #[cfg(target_arch = "x86_64")]
         LEVEL_AVX2 => unsafe { avx2::is_all_ascii(input) },

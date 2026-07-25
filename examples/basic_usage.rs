@@ -28,7 +28,8 @@ fn main() {
     let json_bytes = json::encode(&user).expect("Failed to encode");
     println!("Encoded user: {}", String::from_utf8_lossy(&json_bytes));
 
-    let decoded: User = json::decode(&json_bytes).expect("Failed to decode");
+    let decoded: User = json::decode(&mut json_bytes.to_vec(), &fastserial::arena::Arena::new())
+        .expect("Failed to decode");
     println!("Decoded user: {:?}", decoded);
 
     let post = Post {
@@ -42,7 +43,8 @@ fn main() {
     let json_bytes = json::encode(&post).expect("Failed to encode post");
     println!("\nEncoded post: {}", String::from_utf8_lossy(&json_bytes));
 
-    let decoded: Post = json::decode(&json_bytes).expect("Failed to decode post");
+    let decoded: Post = json::decode(&mut json_bytes.to_vec(), &fastserial::arena::Arena::new())
+        .expect("Failed to decode post");
     println!("Decoded post: {:?}", decoded);
 
     println!("\nSchema hash for User: {:#x}", User::SCHEMA_HASH);

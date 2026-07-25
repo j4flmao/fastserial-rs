@@ -165,7 +165,10 @@ impl Encode for Value {
 }
 
 impl<'de> Decode<'de> for Value {
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         crate::codec::json::skip_whitespace(r);
         match r.peek() {
             b'"' => {
@@ -181,14 +184,12 @@ impl<'de> Decode<'de> for Value {
                     return Ok(Value::Object(map));
                 }
                 loop {
-                    crate::codec::json::skip_whitespace(r);
                     let key = crate::codec::json::read_string_cow(r)?.into_owned();
-                    crate::codec::json::skip_whitespace(r);
-                    r.expect_byte(b':')?;
-                    let val = Value::decode(r)?;
+                    crate::codec::json::skip_colon(r)?;
+                    let val = Value::decode(r, _arena)?;
                     map.insert(key, val);
-                    crate::codec::json::skip_comma_or_close(r, b'}')?;
-                    if r.peek() == b'}' {
+
+                    if !crate::codec::json::skip_comma_or_close(r, b'}')? {
                         r.advance(1);
                         break;
                     }
@@ -204,9 +205,9 @@ impl<'de> Decode<'de> for Value {
                     return Ok(Value::Array(arr));
                 }
                 loop {
-                    arr.push(Value::decode(r)?);
-                    crate::codec::json::skip_comma_or_close(r, b']')?;
-                    if r.peek() == b']' {
+                    arr.push(Value::decode(r, _arena)?);
+
+                    if !crate::codec::json::skip_comma_or_close(r, b']')? {
                         r.advance(1);
                         break;
                     }
@@ -242,25 +243,17 @@ impl<'de> Decode<'de> for Value {
                     Ok(Value::Number(Number::F64(f)))
                 } else if negative {
                     let slice = core::str::from_utf8(&r.data[start..r.get_pos()])
-                        .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
-                    let n: i64 = slice
-                        .parse()
-                        .map_err(|_| Error::NumberOverflow { type_name: "i64" })?;
+                        .map_err(|_| Error::InvalidUtf8)?;
+                    let n: i64 = slice.parse().map_err(|_| Error::NumberOverflow)?;
                     Ok(Value::Number(Number::I64(n)))
                 } else {
                     let slice = core::str::from_utf8(&r.data[start..r.get_pos()])
-                        .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
-                    let n: u64 = slice
-                        .parse()
-                        .map_err(|_| Error::NumberOverflow { type_name: "u64" })?;
+                        .map_err(|_| Error::InvalidUtf8)?;
+                    let n: u64 = slice.parse().map_err(|_| Error::NumberOverflow)?;
                     Ok(Value::Number(Number::U64(n)))
                 }
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "value",
-                got: b,
-                offset: r.get_pos(),
-            }),
+            b => Err(Error::UnexpectedByte),
         }
     }
 }

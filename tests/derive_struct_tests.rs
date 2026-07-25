@@ -10,9 +10,11 @@ struct SingleField {
 
 #[test]
 fn test_single_field_struct() {
-    let s = SingleField { value: 42 };
-    let json = encode(&s).unwrap();
-    let decoded: SingleField = decode(&json).unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = SingleField { value: 42 };
+    let mut json = encode(&s).unwrap();
+    let decoded: SingleField = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -34,7 +36,9 @@ struct ManyFields {
 
 #[test]
 fn test_many_fields_struct() {
-    let s = ManyFields {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = ManyFields {
         a: 1,
         b: 2,
         c: 3,
@@ -46,8 +50,8 @@ fn test_many_fields_struct() {
         i: true,
         j: "test".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: ManyFields = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: ManyFields = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -62,25 +66,29 @@ struct WithOptionals {
 
 #[test]
 fn test_struct_all_options_present() {
-    let s = WithOptionals {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = WithOptionals {
         name: "Alice".to_string(),
         age: Some(30),
         email: Some("alice@example.com".to_string()),
     };
-    let json = encode(&s).unwrap();
-    let decoded: WithOptionals = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: WithOptionals = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_struct_all_options_none() {
-    let s = WithOptionals {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = WithOptionals {
         name: "Bob".to_string(),
         age: None,
         email: None,
     };
-    let json = encode(&s).unwrap();
-    let decoded: WithOptionals = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: WithOptionals = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -94,23 +102,27 @@ struct WithVecs {
 
 #[test]
 fn test_struct_with_populated_vecs() {
-    let s = WithVecs {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = WithVecs {
         tags: vec!["rust".to_string(), "fast".to_string()],
         scores: vec![100, 95, 88],
     };
-    let json = encode(&s).unwrap();
-    let decoded: WithVecs = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: WithVecs = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_struct_with_empty_vecs() {
-    let s = WithVecs {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = WithVecs {
         tags: vec![],
         scores: vec![],
     };
-    let json = encode(&s).unwrap();
-    let decoded: WithVecs = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: WithVecs = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -130,12 +142,14 @@ struct Outer {
 
 #[test]
 fn test_nested_struct() {
-    let s = Outer {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Outer {
         name: "point".to_string(),
         position: Inner { x: 10, y: 20 },
     };
-    let json = encode(&s).unwrap();
-    let decoded: Outer = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: Outer = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -160,7 +174,9 @@ struct Level1 {
 
 #[test]
 fn test_deeply_nested_structs() {
-    let s = Level1 {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Level1 {
         name: "root".to_string(),
         child: Level2 {
             deep: Level3 {
@@ -169,8 +185,8 @@ fn test_deeply_nested_structs() {
             count: 42,
         },
     };
-    let json = encode(&s).unwrap();
-    let decoded: Level1 = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: Level1 = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -189,7 +205,9 @@ struct Container {
 
 #[test]
 fn test_struct_with_vec_of_structs() {
-    let s = Container {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Container {
         items: vec![
             Item {
                 id: 1,
@@ -205,16 +223,18 @@ fn test_struct_with_vec_of_structs() {
             },
         ],
     };
-    let json = encode(&s).unwrap();
-    let decoded: Container = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: Container = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_struct_with_empty_vec_of_structs() {
-    let s = Container { items: vec![] };
-    let json = encode(&s).unwrap();
-    let decoded: Container = decode(&json).unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Container { items: vec![] };
+    let mut json = encode(&s).unwrap();
+    let decoded: Container = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -228,34 +248,40 @@ struct TextContent {
 
 #[test]
 fn test_struct_with_special_chars_in_strings() {
-    let s = TextContent {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = TextContent {
         title: "Hello \"World\"".to_string(),
         body: "Line1\nLine2\tTabbed\\Backslash".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: TextContent = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: TextContent = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_struct_with_empty_strings() {
-    let s = TextContent {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = TextContent {
         title: "".to_string(),
         body: "".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: TextContent = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: TextContent = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_struct_with_unicode_strings() {
-    let s = TextContent {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = TextContent {
         title: "こんにちは".to_string(),
         body: "Emoji: 🦀🚀💡".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: TextContent = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: TextContent = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -269,18 +295,22 @@ struct FloatStruct {
 
 #[test]
 fn test_struct_with_floats() {
-    let s = FloatStruct { x: 1.5, y: 2.75 };
-    let json = encode(&s).unwrap();
-    let decoded: FloatStruct = decode(&json).unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = FloatStruct { x: 1.5, y: 2.75 };
+    let mut json = encode(&s).unwrap();
+    let decoded: FloatStruct = decode(&mut json, &_arena).unwrap();
     assert!((s.x - decoded.x).abs() < 1e-6);
     assert!((s.y - decoded.y).abs() < 1e-14);
 }
 
 #[test]
 fn test_struct_with_zero_floats() {
-    let s = FloatStruct { x: 0.0, y: 0.0 };
-    let json = encode(&s).unwrap();
-    let decoded: FloatStruct = decode(&json).unwrap();
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = FloatStruct { x: 0.0, y: 0.0 };
+    let mut json = encode(&s).unwrap();
+    let decoded: FloatStruct = decode(&mut json, &_arena).unwrap();
     assert_eq!(decoded.x, 0.0);
     assert_eq!(decoded.y, 0.0);
 }
@@ -297,27 +327,31 @@ struct Complex {
 
 #[test]
 fn test_complex_struct() {
-    let s = Complex {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Complex {
         id: 100,
         tags: vec!["a".to_string(), "b".to_string()],
         metadata: Some("info".to_string()),
         scores: vec![Some(10), None, Some(20)],
     };
-    let json = encode(&s).unwrap();
-    let decoded: Complex = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: Complex = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
 #[test]
 fn test_complex_struct_minimal() {
-    let s = Complex {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = Complex {
         id: 0,
         tags: vec![],
         metadata: None,
         scores: vec![],
     };
-    let json = encode(&s).unwrap();
-    let decoded: Complex = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: Complex = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -325,6 +359,8 @@ fn test_complex_struct_minimal() {
 
 #[test]
 fn test_schema_hash_is_consistent() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     // Same type should always produce the same hash
     let hash1 = SingleField::SCHEMA_HASH;
     let hash2 = SingleField::SCHEMA_HASH;
@@ -333,6 +369,8 @@ fn test_schema_hash_is_consistent() {
 
 #[test]
 fn test_primitive_schema_hashes_are_nonzero() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     // Primitive types should have non-zero hashes
     assert_ne!(u8::SCHEMA_HASH, 0);
     assert_ne!(u16::SCHEMA_HASH, 0);
@@ -348,6 +386,8 @@ fn test_primitive_schema_hashes_are_nonzero() {
 
 #[test]
 fn test_different_primitives_different_hashes() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_ne!(u8::SCHEMA_HASH, u16::SCHEMA_HASH);
     assert_ne!(u32::SCHEMA_HASH, i32::SCHEMA_HASH);
     assert_ne!(f32::SCHEMA_HASH, f64::SCHEMA_HASH);
@@ -366,11 +406,13 @@ struct RenameTest {
 
 #[test]
 fn test_rename_attribute_encode() {
-    let s = RenameTest {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = RenameTest {
         id: 1,
         name: "test".to_string(),
     };
-    let json = encode(&s).unwrap();
+    let mut json = encode(&s).unwrap();
     let json_str = String::from_utf8(json.clone()).unwrap();
     assert!(json_str.contains("\"user_id\":"));
     assert!(json_str.contains("\"full_name\":"));
@@ -380,12 +422,14 @@ fn test_rename_attribute_encode() {
 
 #[test]
 fn test_rename_attribute_roundtrip() {
-    let s = RenameTest {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = RenameTest {
         id: 42,
         name: "Alice".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: RenameTest = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: RenameTest = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
 }
 
@@ -400,11 +444,13 @@ struct SkipTest {
 
 #[test]
 fn test_skip_attribute_not_in_output() {
-    let s = SkipTest {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = SkipTest {
         visible: "shown".to_string(),
         hidden: "secret".to_string(),
     };
-    let json = encode(&s).unwrap();
+    let mut json = encode(&s).unwrap();
     let json_str = String::from_utf8(json).unwrap();
     assert!(json_str.contains("\"visible\":"));
     assert!(!json_str.contains("\"hidden\":"));
@@ -413,12 +459,14 @@ fn test_skip_attribute_not_in_output() {
 
 #[test]
 fn test_skip_attribute_default_on_decode() {
-    let s = SkipTest {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut s = SkipTest {
         visible: "hello".to_string(),
         hidden: "should_be_lost".to_string(),
     };
-    let json = encode(&s).unwrap();
-    let decoded: SkipTest = decode(&json).unwrap();
+    let mut json = encode(&s).unwrap();
+    let decoded: SkipTest = decode(&mut json, &_arena).unwrap();
     assert_eq!(decoded.visible, "hello");
     assert_eq!(decoded.hidden, String::default());
 }

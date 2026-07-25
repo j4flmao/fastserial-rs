@@ -183,8 +183,7 @@ impl Format for BinaryFormat {
         if data.len() < len {
             return Err(Error::UnexpectedEof);
         }
-        let s =
-            core::str::from_utf8(data).map_err(|_| Error::InvalidUtf8 { byte_offset: r.pos })?;
+        let s = core::str::from_utf8(data).map_err(|_| Error::InvalidUtf8)?;
         r.advance(len);
         Ok(s)
     }
@@ -213,11 +212,7 @@ impl Format for BinaryFormat {
         if b == 0 {
             Ok(())
         } else {
-            Err(Error::UnexpectedByte {
-                expected: "null (0x00)",
-                got: b,
-                offset: r.pos - 1,
-            })
+            Err(Error::UnexpectedByte)
         }
     }
 
@@ -273,11 +268,7 @@ impl Format for BinaryFormat {
                 r.advance(1 + len);
                 Ok(())
             }
-            _ => Err(Error::UnexpectedByte {
-                expected: "binary value",
-                got: r.peek(),
-                offset: r.pos,
-            }),
+            _ => Err(Error::UnexpectedByte),
         }
     }
 }

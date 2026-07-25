@@ -90,8 +90,8 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         let mut skip = false;
 
         for attr in &field.attrs {
-            if attr.path().is_ident("fastserial") {
-                let _ = attr.parse_nested_meta(|meta| {
+            if attr.meta.path().is_ident("fastserial") {
+                let _ = attr.parse_nested_meta(|meta: syn::meta::ParseNestedMeta| {
                     if meta.path.is_ident("skip") {
                         skip = true;
                     } else if meta.path.is_ident("rename") {
@@ -118,7 +118,7 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         });
 
         field_defaults.extend(quote! {
-            #field_name: #var_ident.ok_or(::fastserial::Error::MissingField { name: #field_name_str })?,
+            #field_name: #var_ident.ok_or(::fastserial::Error::MissingField)?,
         });
 
         active_fields.push((field_name_str.len(), field_name_str.clone(), var_ident));
@@ -152,90 +152,50 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     for (len, entries) in &buckets {
         let len_lit = proc_macro2::Literal::usize_unsuffixed(*len);
 
-        if entries.len() <= 3 {
-            // Linear match for small buckets (≤3 same-length fields).
-            // Byte-literal patterns (b"foo") are compiled to integer compares
-            // by LLVM — no memcmp call, extremely fast.
-            let mut inner = quote! {};
-            for (name, var) in entries {
-                let lit = syn::LitByteStr::new(name.as_bytes(), proc_macro2::Span::call_site());
-                inner.extend(quote! {
-                    #lit => {
-                        #var = Some(::fastserial::Decode::decode(r)?);
-                    }
-                });
-            }
-            decode_body.extend(quote! {
-                #len_lit => match key_bytes {
-                    #inner
-                    _ => { ::fastserial::codec::json::skip_value(r)?; }
-                },
-            });
-        } else {
-            // Binary search for large buckets (>3 same-length fields).
-            // Sorting ensures O(log n) comparisons instead of O(n).
-            let mut sorted_entries = entries.clone();
-            sorted_entries.sort_by(|(a, _), (b, _)| a.cmp(b));
-
-            let sorted_names: Vec<&str> = sorted_entries
-                .iter()
-                .map(|(name, _)| name.as_str())
-                .collect();
-
-            let mut binary_arms = quote! {};
-            for (idx, (_, var)) in sorted_entries.iter().enumerate() {
-                binary_arms.extend(quote! {
-                    Some(#idx) => {
-                        #var = Some(::fastserial::Decode::decode(r)?);
-                    }
-                });
-            }
-
-            decode_body.extend(quote! {
-                #len_lit => {
-                    let bucket_keys = &[#(#sorted_names),*];
-                    match ::fastserial::codec::json::binary_search_key(key_bytes, bucket_keys) {
-                        #binary_arms
-                        _ => { ::fastserial::codec::json::skip_value(r)?; }
-                    }
-                },
+        let mut inner = quote! {};
+        for (name, var) in entries {
+            let lit = syn::LitByteStr::new(name.as_bytes(), proc_macro2::Span::call_site());
+            inner.extend(quote! {
+                #lit => {
+                    #var = Some(::fastserial::Decode::decode(r, _arena)?);
+                }
             });
         }
+        decode_body.extend(quote! {
+            #len_lit => match key_bytes {
+                #inner
+                _ => { ::fastserial::codec::json::skip_value(r)?; }
+            },
+        });
     }
 
     quote! {
         impl #impl_gens ::fastserial::Decode<'de> for #name #ty_gens #where_clause {
-            #[inline(always)]
-            fn decode(r: &mut ::fastserial::io::ReadBuffer<'de>) -> ::core::result::Result<Self, ::fastserial::Error> {
+            #[inline]
+            fn decode(r: &mut ::fastserial::io::ReadBuffer<'de>, _arena: &'de ::fastserial::arena::Arena) -> ::core::result::Result<Self, ::fastserial::Error> {
                 #field_inits
 
                 ::fastserial::codec::json::skip_whitespace(r);
                 r.expect_byte(b'{')?;
+                ::fastserial::codec::json::skip_whitespace(r);
 
-                let mut first = true;
-                loop {
-                    ::fastserial::codec::json::skip_whitespace(r);
+                if r.peek() == b'}' {
+                    r.advance(1);
+                } else {
+                    loop {
+                        let key_bytes = ::fastserial::codec::json::read_key_fast(r)?;
+                        ::fastserial::codec::json::skip_colon(r)?;
 
-                    if r.peek() == b'}' {
-                        r.advance(1);
-                        break;
-                    }
+                        match key_bytes.len() {
+                            #decode_body
+                            _ => {
+                                ::fastserial::codec::json::skip_value(r)?;
+                            }
+                        }
 
-                    if !first {
-                        r.expect_byte(b',')?;
-                        ::fastserial::codec::json::skip_whitespace(r);
-                    }
-                    first = false;
-
-                    let key_bytes = ::fastserial::codec::json::read_key_fast(r)?;
-                    ::fastserial::codec::json::skip_whitespace(r);
-                    r.expect_byte(b':')?;
-                    ::fastserial::codec::json::skip_whitespace(r);
-
-                    match key_bytes.len() {
-                        #decode_body
-                        _ => {
-                            ::fastserial::codec::json::skip_value(r)?;
+                        if !::fastserial::codec::json::skip_comma_or_close(r, b'}')? {
+                            r.advance(1);
+                            break;
                         }
                     }
                 }

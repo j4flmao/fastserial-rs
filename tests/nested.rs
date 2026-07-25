@@ -27,6 +27,7 @@ struct Company {
 
 #[test]
 fn test_nested_struct_roundtrip() {
+    let _arena = fastserial::arena::Arena::new();
     let company = Company {
         name: "Tech Corp".to_string(),
         employees: vec![
@@ -61,14 +62,15 @@ fn test_nested_struct_roundtrip() {
         founded_year: 2010,
     };
 
-    let json = encode(&company).expect("Failed to encode Company");
-    let decoded: Company = decode(&json).expect("Failed to decode Company");
+    let mut json = encode(&company).expect("Failed to encode Company");
+    let decoded: Company = decode(&mut json, &_arena).expect("Failed to decode Company");
 
     assert_eq!(company, decoded);
 }
 
 #[test]
 fn test_deeply_nested_vecs() {
+    let _arena = fastserial::arena::Arena::new();
     #[derive(Debug, PartialEq, Encode, Decode)]
     struct Matrix {
         data: Vec<Vec<Vec<i32>>>,
@@ -78,22 +80,23 @@ fn test_deeply_nested_vecs() {
         data: vec![vec![vec![1, 2], vec![3, 4]], vec![vec![5, 6], vec![7, 8]]],
     };
 
-    let json = encode(&matrix).expect("Failed to encode Matrix");
-    let decoded: Matrix = decode(&json).expect("Failed to decode Matrix");
+    let mut json = encode(&matrix).expect("Failed to encode Matrix");
+    let decoded: Matrix = decode(&mut json, &_arena).expect("Failed to decode Matrix");
 
     assert_eq!(matrix, decoded);
 }
 
 #[test]
 fn test_empty_nested_structs() {
+    let _arena = fastserial::arena::Arena::new();
     let company = Company {
         name: "".to_string(),
         employees: vec![],
         founded_year: 0,
     };
 
-    let json = encode(&company).expect("Failed to encode empty Company");
-    let decoded: Company = decode(&json).expect("Failed to decode empty Company");
+    let mut json = encode(&company).expect("Failed to encode empty Company");
+    let decoded: Company = decode(&mut json, &_arena).expect("Failed to decode empty Company");
 
     assert_eq!(company, decoded);
 }

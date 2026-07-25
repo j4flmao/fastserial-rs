@@ -13,7 +13,6 @@
 //! undefined behaviour. This rewrite uses an append-only list of fixed
 //! `Box<[MaybeUninit<u8>]>` chunks so reallocation is impossible.
 
-#![cfg(feature = "arena")]
 #![doc(hidden)]
 
 use alloc::alloc::Layout;
@@ -81,9 +80,9 @@ pub struct Arena {
     /// All chunks except the current one. Older chunks may have wasted tail
     /// space, but they own live data and must not be reset until the arena
     /// itself is reset.
-    chunks: Vec<Chunk>,
+    chunks: core::cell::RefCell<Vec<Chunk>>,
     /// Active chunk we try to allocate from first.
-    current: Chunk,
+    current: core::cell::RefCell<Chunk>,
 }
 
 impl Arena {
@@ -99,14 +98,14 @@ impl Arena {
     pub fn with_capacity(cap: usize) -> Self {
         let cap = cap.max(DEFAULT_CHUNK_SIZE);
         Self {
-            chunks: Vec::new(),
-            current: Chunk::with_capacity(cap),
+            chunks: core::cell::RefCell::new(Vec::new()),
+            current: core::cell::RefCell::new(Chunk::with_capacity(cap)),
         }
     }
 
     /// Allocates `val` in the arena and returns a stable mutable reference.
     #[inline]
-    pub fn alloc<T>(&mut self, val: T) -> &mut T {
+    pub fn alloc<T>(&self, val: T) -> &mut T {
         let layout = Layout::for_value(&val);
         let ptr = self.alloc_layout(layout).as_ptr() as *mut T;
         // Safety: ptr came from alloc_layout with the right size and
@@ -119,7 +118,14 @@ impl Arena {
 
     /// Copies `slice` into the arena and returns a stable mutable slice.
     #[inline]
-    pub fn alloc_slice<T: Copy>(&mut self, slice: &[T]) -> &mut [T] {
+    pub fn alloc_bytes(&self, len: usize) -> &mut [u8] {
+        let layout = core::alloc::Layout::array::<u8>(len).unwrap();
+        let ptr = self.alloc_layout(layout).as_ptr() as *mut u8;
+        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
+    }
+
+    #[inline]
+    pub fn alloc_slice<T: Copy>(&self, slice: &[T]) -> &mut [T] {
         let layout = Layout::array::<T>(slice.len()).expect("layout overflow");
         let ptr = self.alloc_layout(layout).as_ptr() as *mut T;
         // Safety: layout fits exactly `slice.len()` Ts, and source is non-overlapping.
@@ -129,21 +135,22 @@ impl Arena {
         }
     }
 
-    fn alloc_layout(&mut self, layout: Layout) -> NonNull<u8> {
-        if let Some(p) = self.current.try_alloc(layout) {
+    fn alloc_layout(&self, layout: Layout) -> NonNull<u8> {
+        if let Some(p) = self.current.borrow().try_alloc(layout) {
             return p;
         }
         // Need a new chunk: at least double the previous size, but enough
         // to fit `layout` even if it's larger than DEFAULT_CHUNK_SIZE.
-        let new_cap = (self.current.capacity() * 2)
+        let new_cap = (self.current.borrow().capacity() * 2)
             .max(layout.size() + layout.align())
             .max(DEFAULT_CHUNK_SIZE);
         let new_chunk = Chunk::with_capacity(new_cap);
         // Move current into the saved list, install the new chunk.
-        let old = mem::replace(&mut self.current, new_chunk);
-        self.chunks.push(old);
+        let old = mem::replace(&mut *self.current.borrow_mut(), new_chunk);
+        self.chunks.borrow_mut().push(old);
         // Allocation in a fresh chunk cannot fail unless layout itself is bogus.
         self.current
+            .borrow()
             .try_alloc(layout)
             .expect("fresh chunk should always satisfy a single allocation")
     }
@@ -152,24 +159,39 @@ impl Arena {
     /// every reference previously handed out.
     pub fn reset(&mut self) {
         // Pick the biggest chunk to keep; drop the rest.
-        let mut keep = mem::replace(&mut self.current, Chunk::with_capacity(DEFAULT_CHUNK_SIZE));
-        for c in self.chunks.drain(..) {
+        let mut keep = mem::replace(
+            &mut *self.current.borrow_mut(),
+            Chunk::with_capacity(DEFAULT_CHUNK_SIZE),
+        );
+        for c in self.chunks.borrow_mut().drain(..) {
             if c.capacity() > keep.capacity() {
                 keep = c;
             }
         }
         keep.reset();
-        self.current = keep;
+        *self.current.borrow_mut() = keep;
     }
 
     /// Total bytes used across all chunks, including alignment padding.
     pub fn used_bytes(&self) -> usize {
-        self.current.used.get() + self.chunks.iter().map(|c| c.used.get()).sum::<usize>()
+        self.current.borrow().used.get()
+            + self
+                .chunks
+                .borrow()
+                .iter()
+                .map(|c| c.used.get())
+                .sum::<usize>()
     }
 
     /// Total capacity across all chunks.
     pub fn capacity(&self) -> usize {
-        self.current.capacity() + self.chunks.iter().map(|c| c.capacity()).sum::<usize>()
+        self.current.borrow().capacity()
+            + self
+                .chunks
+                .borrow()
+                .iter()
+                .map(|c| c.capacity())
+                .sum::<usize>()
     }
 }
 

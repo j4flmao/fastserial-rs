@@ -4,63 +4,87 @@ use fastserial::simd;
 
 #[test]
 fn test_scan_empty_input() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b""), 0);
 }
 
 #[test]
 fn test_scan_no_special_chars() {
-    let input = b"abcdefghijklmnop";
-    assert_eq!(simd::scan_quote_or_backslash(input), input.len());
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = b"abcdefghijklmnop".to_vec();
+    assert_eq!(simd::scan_quote_or_backslash(&input), input.len());
 }
 
 #[test]
 fn test_scan_quote_at_start() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"\"hello"), 0);
 }
 
 #[test]
 fn test_scan_quote_at_end() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"hello\""), 5);
 }
 
 #[test]
 fn test_scan_backslash_at_start() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"\\hello"), 0);
 }
 
 #[test]
 fn test_scan_backslash_at_end() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"hello\\"), 5);
 }
 
 #[test]
 fn test_scan_quote_before_backslash() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"abc\"def\\ghi"), 3);
 }
 
 #[test]
 fn test_scan_backslash_before_quote() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"abc\\def\"ghi"), 3);
 }
 
 #[test]
 fn test_scan_only_quote() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"\""), 0);
 }
 
 #[test]
 fn test_scan_only_backslash() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::scan_quote_or_backslash(b"\\"), 0);
 }
 
 #[test]
 fn test_scan_large_no_match() {
-    let input = vec![b'a'; 256];
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = vec![b'a'; 256];
     assert_eq!(simd::scan_quote_or_backslash(&input), 256);
 }
 
 #[test]
 fn test_scan_large_with_quote_at_end() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'a'; 255];
     input.push(b'"');
     assert_eq!(simd::scan_quote_or_backslash(&input), 255);
@@ -68,6 +92,8 @@ fn test_scan_large_with_quote_at_end() {
 
 #[test]
 fn test_scan_boundary_15() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'x'; 15];
     input.push(b'"');
     assert_eq!(simd::scan_quote_or_backslash(&input), 15);
@@ -75,6 +101,8 @@ fn test_scan_boundary_15() {
 
 #[test]
 fn test_scan_boundary_16() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'x'; 16];
     input.push(b'"');
     assert_eq!(simd::scan_quote_or_backslash(&input), 16);
@@ -82,6 +110,8 @@ fn test_scan_boundary_16() {
 
 #[test]
 fn test_scan_boundary_17() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'x'; 17];
     input.push(b'"');
     assert_eq!(simd::scan_quote_or_backslash(&input), 17);
@@ -89,6 +119,8 @@ fn test_scan_boundary_17() {
 
 #[test]
 fn test_scan_boundary_63() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'x'; 63];
     input.push(b'\\');
     assert_eq!(simd::scan_quote_or_backslash(&input), 63);
@@ -96,6 +128,8 @@ fn test_scan_boundary_63() {
 
 #[test]
 fn test_scan_boundary_64() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'x'; 64];
     input.push(b'\\');
     assert_eq!(simd::scan_quote_or_backslash(&input), 64);
@@ -105,47 +139,65 @@ fn test_scan_boundary_64() {
 
 #[test]
 fn test_skip_whitespace_empty() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b""), 0);
 }
 
 #[test]
 fn test_skip_whitespace_no_ws() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b"hello"), 0);
 }
 
 #[test]
 fn test_skip_whitespace_spaces() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b"   hello"), 3);
 }
 
 #[test]
 fn test_skip_whitespace_tabs() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b"\t\thello"), 2);
 }
 
 #[test]
 fn test_skip_whitespace_newlines() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b"\n\nhello"), 2);
 }
 
 #[test]
 fn test_skip_whitespace_carriage_return() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b"\r\nhello"), 2);
 }
 
 #[test]
 fn test_skip_whitespace_mixed() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert_eq!(simd::skip_whitespace(b" \t\n\r hello"), 5);
 }
 
 #[test]
 fn test_skip_whitespace_all_whitespace() {
-    let input = b"     ";
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = b"     ".to_vec();
     assert_eq!(simd::skip_whitespace(input), input.len());
 }
 
 #[test]
 fn test_skip_whitespace_large() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b' '; 200];
     input.push(b'x');
     assert_eq!(simd::skip_whitespace(&input), 200);
@@ -153,6 +205,8 @@ fn test_skip_whitespace_large() {
 
 #[test]
 fn test_skip_whitespace_boundary_31() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b' '; 31];
     input.push(b'x');
     assert_eq!(simd::skip_whitespace(&input), 31);
@@ -160,6 +214,8 @@ fn test_skip_whitespace_boundary_31() {
 
 #[test]
 fn test_skip_whitespace_boundary_32() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b' '; 32];
     input.push(b'x');
     assert_eq!(simd::skip_whitespace(&input), 32);
@@ -167,6 +223,8 @@ fn test_skip_whitespace_boundary_32() {
 
 #[test]
 fn test_skip_whitespace_boundary_33() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b' '; 33];
     input.push(b'x');
     assert_eq!(simd::skip_whitespace(&input), 33);
@@ -176,22 +234,30 @@ fn test_skip_whitespace_boundary_33() {
 
 #[test]
 fn test_is_all_ascii_empty() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert!(simd::is_all_ascii(b""));
 }
 
 #[test]
 fn test_is_all_ascii_basic() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert!(simd::is_all_ascii(b"hello world"));
 }
 
 #[test]
 fn test_is_all_ascii_full_range() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let input: Vec<u8> = (0..128).collect();
     assert!(simd::is_all_ascii(&input));
 }
 
 #[test]
 fn test_is_all_ascii_with_non_ascii() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert!(!simd::is_all_ascii(b"\x80"));
     assert!(!simd::is_all_ascii(b"\xff"));
     assert!(!simd::is_all_ascii("ñ".as_bytes()));
@@ -199,17 +265,23 @@ fn test_is_all_ascii_with_non_ascii() {
 
 #[test]
 fn test_is_all_ascii_mixed() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     assert!(!simd::is_all_ascii("hello café".as_bytes()));
 }
 
 #[test]
 fn test_is_all_ascii_large_ascii() {
-    let input = vec![b'a'; 1000];
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = vec![b'a'; 1000];
     assert!(simd::is_all_ascii(&input));
 }
 
 #[test]
 fn test_is_all_ascii_large_with_non_ascii_at_end() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let mut input = vec![b'a'; 999];
     input.push(0x80);
     assert!(!simd::is_all_ascii(&input));
@@ -217,18 +289,24 @@ fn test_is_all_ascii_large_with_non_ascii_at_end() {
 
 #[test]
 fn test_is_all_ascii_boundary_31() {
-    let input = vec![b'x'; 31];
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = vec![b'x'; 31];
     assert!(simd::is_all_ascii(&input));
 }
 
 #[test]
 fn test_is_all_ascii_boundary_32() {
-    let input = vec![b'x'; 32];
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = vec![b'x'; 32];
     assert!(simd::is_all_ascii(&input));
 }
 
 #[test]
 fn test_is_all_ascii_boundary_33() {
-    let input = vec![b'x'; 33];
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
+    let mut input = vec![b'x'; 33];
     assert!(simd::is_all_ascii(&input));
 }

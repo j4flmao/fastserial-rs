@@ -18,7 +18,8 @@ fn main() {
     let json_bytes = json::encode(&event).expect("Failed to encode");
     println!("Encoded event: {}", String::from_utf8_lossy(&json_bytes));
 
-    let decoded: Event = json::decode(&json_bytes).expect("Failed to decode");
+    let decoded: Event = json::decode(&mut json_bytes.to_vec(), &fastserial::arena::Arena::new())
+        .expect("Failed to decode");
     println!("Decoded event: {:?}", decoded);
 
     assert_eq!(event.event_type, decoded.event_type);
