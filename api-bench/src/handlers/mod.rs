@@ -483,11 +483,11 @@ async fn run_simple_user_benchmark(sample_size: i32) -> BatchReport {
     let serde_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let mut json_data_fs = json_data.clone();
+    let mut arena = fastserial::arena::Arena::new();
     let start = Instant::now();
     for _ in 0..sample_size {
-        let _: SimpleUser<'_> =
-            fastserial::json::decode_str(&mut json_data_fs, &fastserial::arena::Arena::new())
-                .unwrap();
+        let _: SimpleUser<'_> = fastserial::json::decode_str(&mut json_data_fs, &arena).unwrap();
+        arena.reset();
     }
     let fastserial_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -549,11 +549,12 @@ async fn run_batch_users_benchmark(sample_size: i32) -> BatchReport {
     let serde_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let mut json_data_fs = json_data.clone();
+    let mut arena = fastserial::arena::Arena::new();
     let start = Instant::now();
     for _ in 0..sample_size {
         let _: Vec<SimpleUser<'_>> =
-            fastserial::json::decode_str(&mut json_data_fs, &fastserial::arena::Arena::new())
-                .unwrap();
+            fastserial::json::decode_str(&mut json_data_fs, &arena).unwrap();
+        arena.reset();
     }
     let fastserial_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -605,11 +606,11 @@ async fn run_product_benchmark(sample_size: i32) -> BatchReport {
     let serde_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let mut json_data_fs = json_data.clone();
+    let mut arena = fastserial::arena::Arena::new();
     let start = Instant::now();
     for _ in 0..sample_size {
-        let _: Product =
-            fastserial::json::decode_str(&mut json_data_fs, &fastserial::arena::Arena::new())
-                .unwrap();
+        let _: Product = fastserial::json::decode_str(&mut json_data_fs, &arena).unwrap();
+        arena.reset();
     }
     let fastserial_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -686,11 +687,11 @@ async fn run_order_benchmark(sample_size: i32) -> BatchReport {
     let serde_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let mut json_data_fs = json_data.clone();
+    let mut arena = fastserial::arena::Arena::new();
     let start = Instant::now();
     for _ in 0..sample_size {
-        let _: Order =
-            fastserial::json::decode_str(&mut json_data_fs, &fastserial::arena::Arena::new())
-                .unwrap();
+        let _: Order = fastserial::json::decode_str(&mut json_data_fs, &arena).unwrap();
+        arena.reset();
     }
     let fastserial_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -773,11 +774,11 @@ async fn run_blog_post_benchmark(sample_size: i32) -> BatchReport {
     let serde_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     let mut json_data_fs = json_data.clone();
+    let mut arena = fastserial::arena::Arena::new();
     let start = Instant::now();
     for _ in 0..sample_size {
-        let _: BlogPost =
-            fastserial::json::decode_str(&mut json_data_fs, &fastserial::arena::Arena::new())
-                .unwrap();
+        let _: BlogPost = fastserial::json::decode_str(&mut json_data_fs, &arena).unwrap();
+        arena.reset();
     }
     let fastserial_decode_ms = start.elapsed().as_secs_f64() * 1000.0;
 
