@@ -472,7 +472,8 @@ fn generate_report_html(
 }
 
 async fn run_simple_user_benchmark(sample_size: i32) -> BatchReport {
-    let json_data = fs::read_to_string("api-bench/jsondata/simple_user.json").or_else(|_| fs::read_to_string("jsondata/simple_user.json"))
+    let json_data = fs::read_to_string("api-bench/jsondata/simple_user.json")
+        .or_else(|_| fs::read_to_string("jsondata/simple_user.json"))
         .unwrap_or_else(|_| "{}".to_string());
 
     let start = Instant::now();
@@ -535,7 +536,8 @@ async fn run_simple_user_benchmark(sample_size: i32) -> BatchReport {
 }
 
 async fn run_batch_users_benchmark(sample_size: i32) -> BatchReport {
-    let json_data = fs::read_to_string("api-bench/jsondata/batch_users.json").or_else(|_| fs::read_to_string("jsondata/batch_users.json"))
+    let json_data = fs::read_to_string("api-bench/jsondata/batch_users.json")
+        .or_else(|_| fs::read_to_string("jsondata/batch_users.json"))
         .unwrap_or_else(|_| "[]".to_string());
     let users: Vec<SimpleUser> = serde_json::from_str(&json_data).unwrap();
     let record_count = users.len() as i32;
@@ -592,7 +594,8 @@ async fn run_batch_users_benchmark(sample_size: i32) -> BatchReport {
 }
 
 async fn run_product_benchmark(sample_size: i32) -> BatchReport {
-    let json_data = fs::read_to_string("api-bench/jsondata/complex_product.json").or_else(|_| fs::read_to_string("jsondata/complex_product.json"))
+    let json_data = fs::read_to_string("api-bench/jsondata/complex_product.json")
+        .or_else(|_| fs::read_to_string("jsondata/complex_product.json"))
         .unwrap_or_else(|_| "{}".to_string());
 
     let start = Instant::now();
@@ -672,7 +675,8 @@ async fn run_product_benchmark(sample_size: i32) -> BatchReport {
 }
 
 async fn run_order_benchmark(sample_size: i32) -> BatchReport {
-    let json_data = fs::read_to_string("api-bench/jsondata/nested_order.json").or_else(|_| fs::read_to_string("jsondata/nested_order.json"))
+    let json_data = fs::read_to_string("api-bench/jsondata/nested_order.json")
+        .or_else(|_| fs::read_to_string("jsondata/nested_order.json"))
         .unwrap_or_else(|_| "{}".to_string());
 
     let start = Instant::now();
@@ -758,7 +762,8 @@ async fn run_order_benchmark(sample_size: i32) -> BatchReport {
 }
 
 async fn run_blog_post_benchmark(sample_size: i32) -> BatchReport {
-    let json_data = fs::read_to_string("api-bench/jsondata/blog_post.json").or_else(|_| fs::read_to_string("jsondata/blog_post.json"))
+    let json_data = fs::read_to_string("api-bench/jsondata/blog_post.json")
+        .or_else(|_| fs::read_to_string("jsondata/blog_post.json"))
         .unwrap_or_else(|_| "{}".to_string());
 
     let start = Instant::now();

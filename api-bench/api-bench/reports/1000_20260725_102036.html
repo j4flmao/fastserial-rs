@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>FastSerial Benchmark - 1000_20260725_102036</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: white; text-align: center; margin-bottom: 10px; }
+        .subtitle { color: #e0e0e0; text-align: center; margin-bottom: 30px; }
+        .back-link { display: inline-block; padding: 10px 20px; background: white; color: #667eea; text-decoration: none; border-radius: 8px; margin-bottom: 20px; font-weight: 600; }
+        .summary { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white; display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; }
+        .summary-card { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; text-align: center; }
+        .summary-card .value { font-size: 2em; font-weight: bold; }
+        .summary-card .label { font-size: 0.9em; opacity: 0.9; }
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        .card h2 { color: #333; margin-bottom: 15px; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #667eea; color: white; }
+        .speedup { font-weight: bold; }
+        .speedup.positive { color: #11998e; }
+        .speedup.negative { color: #e74c3c; }
+        .chart-container { position: relative; height: 400px; margin: 20px 0; }
+        .legend { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 30px; justify-content: center; }
+        .legend span { display: flex; align-items: center; gap: 8px; }
+        .legend .dot { width: 16px; height: 16px; border-radius: 4px; }
+        .legend .dot.fs { background: #11998e; }
+        .legend .dot.sj { background: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back</a>
+        <h1>FastSerial Benchmark Report</h1>
+        <p class="subtitle">Sample: 1000 | Type: all</p>
+        
+        <div class="legend">
+            <span><span class="dot fs"></span> <strong>fs</strong> = fastserial (our library)</span>
+            <span><span class="dot sj"></span> <strong>sj</strong> = serde_json (comparison)</span>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-card"><div class="value">1.54x</div><div class="label">Avg Encode</div></div>
+            <div class="summary-card"><div class="value">0.87x</div><div class="label">Avg Decode</div></div>
+            <div class="summary-card"><div class="value">1.21 ms</div><div class="label">fastserial encode</div></div>
+            <div class="summary-card"><div class="value">2.10 ms</div><div class="label">serde_json encode</div></div>
+            <div class="summary-card"><div class="value">3.76 ms</div><div class="label">fastserial decode</div></div>
+            <div class="summary-card"><div class="value">3.46 ms</div><div class="label">serde_json decode</div></div>
+        </div>
+        
+        <div class="card">
+            <h2>Performance Chart</h2>
+            <div class="chart-container"><canvas id="chart"></canvas></div>
+        </div>
+        
+        <div class="card">
+            <h2>Speedup</h2>
+            <div class="chart-container"><canvas id="speedupChart"></canvas></div>
+        </div>
+        
+        <div class="card">
+            <h2>Results</h2>
+            <table>
+            <thead>
+                <tr>
+                    <th>Test Type</th>
+                    <th>Records</th>
+                    <th>fastserial encode (ms)</th>
+                    <th>serde_json encode (ms)</th>
+                    <th>fastserial decode (ms)</th>
+                    <th>serde_json decode (ms)</th>
+                    <th>Encode Speedup</th>
+                    <th>Decode Speedup</th>
+                </tr>
+            </thead><tbody><tr><td><strong>Simple User</strong></td><td>1000</td><td>0.45 ms</td><td>0.34 ms</td><td>0.45 ms</td><td>0.29 ms</td><td class="speedup negative">0.76x</td><td class="speedup negative">0.63x</td></tr><tr><td><strong>Batch (15 users)</strong></td><td>15000</td><td>2.36 ms</td><td>4.98 ms</td><td>4.69 ms</td><td>4.14 ms</td><td class="speedup positive">2.11x</td><td class="speedup negative">0.88x</td></tr><tr><td><strong>Complex Product</strong></td><td>1000</td><td>0.95 ms</td><td>1.45 ms</td><td>3.17 ms</td><td>3.25 ms</td><td class="speedup positive">1.53x</td><td class="speedup positive">1.02x</td></tr><tr><td><strong>Nested Order</strong></td><td>1000</td><td>1.26 ms</td><td>1.74 ms</td><td>2.90 ms</td><td>2.58 ms</td><td class="speedup positive">1.38x</td><td class="speedup negative">0.89x</td></tr><tr><td><strong>Blog Post</strong></td><td>1000</td><td>1.05 ms</td><td>1.99 ms</td><td>7.59 ms</td><td>7.04 ms</td><td class="speedup positive">1.90x</td><td class="speedup negative">0.93x</td></tr></tbody></table>
+        </div>
+    </div>
+    
+    <script>
+        const testNames = ['Simple User','Batch (15 users)','Complex Product','Nested Order','Blog Post'];
+        const fsEncodeData = [0.45,2.36,0.95,1.26,1.05];
+        const sjEncodeData = [0.34,4.98,1.45,1.74,1.99];
+        const fsDecodeData = [0.45,4.69,3.17,2.90,7.59];
+        const sjDecodeData = [0.29,4.14,3.25,2.58,7.04];
+        
+        new Chart(document.getElementById('chart'), {
+            type: 'bar',
+            data: {
+                labels: testNames,
+                datasets: [
+                    { label: 'fs encode', data: fsEncodeData, backgroundColor: '#11998e' },
+                    { label: 'sj encode', data: sjEncodeData, backgroundColor: '#667eea' },
+                    { label: 'fs decode', data: fsDecodeData, backgroundColor: '#38ef7d' },
+                    { label: 'sj decode', data: sjDecodeData, backgroundColor: '#f39c12' }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+        });
+        
+        new Chart(document.getElementById('speedupChart'), {
+            type: 'bar',
+            data: {
+                labels: testNames,
+                datasets: [
+                    { label: 'Encode Speedup', data: fsEncodeData.map((v,i)=>sjEncodeData[i]/v), backgroundColor: '#9b59b6' },
+                    { label: 'Decode Speedup', data: fsDecodeData.map((v,i)=>sjDecodeData[i]/v), backgroundColor: '#e74c3c' }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+        });
+    </script>
+</body>
+</html>
