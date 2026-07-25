@@ -166,11 +166,7 @@ impl Format for MsgPackFormat {
         match r.next_byte()? {
             0xC2 => Ok(false),
             0xC3 => Ok(true),
-            b => Err(Error::UnexpectedByte {
-                expected: "bool",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -205,11 +201,7 @@ impl Format for MsgPackFormat {
                     bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
                 ]))
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "unsigned integer",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -247,11 +239,7 @@ impl Format for MsgPackFormat {
                     bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
                 ]))
             }
-            _ => Err(Error::UnexpectedByte {
-                expected: "signed integer",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            _ => Err(Error::UnexpectedByte),
         }
     }
 
@@ -273,11 +261,7 @@ impl Format for MsgPackFormat {
         let len = match r.next_byte()? {
             b if b < 0xC0 => {
                 if b < 0xA0 {
-                    return Err(Error::UnexpectedByte {
-                        expected: "fixstr",
-                        got: b,
-                        offset: r.get_pos() - 1,
-                    });
+                    return Err(Error::UnexpectedByte);
                 }
                 (b & 0x1F) as usize
             }
@@ -299,11 +283,7 @@ impl Format for MsgPackFormat {
                 u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
             }
             b => {
-                return Err(Error::UnexpectedByte {
-                    expected: "string",
-                    got: b,
-                    offset: r.get_pos() - 1,
-                });
+                return Err(Error::UnexpectedByte);
             }
         };
 
@@ -311,9 +291,7 @@ impl Format for MsgPackFormat {
         if data.len() < len {
             return Err(Error::UnexpectedEof);
         }
-        let s = core::str::from_utf8(data).map_err(|_| Error::InvalidUtf8 {
-            byte_offset: r.get_pos(),
-        })?;
+        let s = core::str::from_utf8(data).map_err(|_| Error::InvalidUtf8)?;
         r.advance(len);
         Ok(s)
     }
@@ -339,11 +317,7 @@ impl Format for MsgPackFormat {
                 u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
             }
             b => {
-                return Err(Error::UnexpectedByte {
-                    expected: "binary",
-                    got: b,
-                    offset: r.get_pos() - 1,
-                });
+                return Err(Error::UnexpectedByte);
             }
         };
 
@@ -359,11 +333,7 @@ impl Format for MsgPackFormat {
     fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
         match r.next_byte()? {
             0xC0 => Ok(()),
-            b => Err(Error::UnexpectedByte {
-                expected: "null",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -374,11 +344,7 @@ impl Format for MsgPackFormat {
                 if b < 0x80 {
                     Ok((b & 0x0F) as usize)
                 } else {
-                    Err(Error::UnexpectedByte {
-                        expected: "fixmap",
-                        got: b,
-                        offset: r.get_pos() - 1,
-                    })
+                    Err(Error::UnexpectedByte)
                 }
             }
             0x80 => Ok(0),
@@ -398,11 +364,7 @@ impl Format for MsgPackFormat {
                 r.advance(4);
                 Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "map",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -436,11 +398,7 @@ impl Format for MsgPackFormat {
                 r.advance(4);
                 Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "array",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -606,11 +564,7 @@ impl Format for MsgPackFormat {
                 r.advance(len);
                 Ok(())
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "msgpack value",
-                got: b,
-                offset: r.get_pos() - 1,
-            }),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 }
@@ -632,8 +586,11 @@ pub mod encode {
 pub mod decode {
     use super::*;
 
-    pub fn decode<'de, T: Decode<'de>>(input: &'de [u8]) -> Result<T, Error> {
+    pub fn decode<'de, T: Decode<'de>>(
+        input: &'de mut [u8],
+        arena: &'de crate::arena::Arena,
+    ) -> Result<T, Error> {
         let mut r = crate::io::ReadBuffer::new(input);
-        T::decode(&mut r)
+        T::decode(&mut r, arena)
     }
 }

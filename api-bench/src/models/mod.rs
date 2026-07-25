@@ -1,10 +1,14 @@
 use fastserial::{Decode, Encode};
 
+use std::borrow::Cow;
+
 #[derive(Debug, Encode, Decode, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SimpleUser {
+pub struct SimpleUser<'a> {
     pub id: i64,
-    pub username: String,
-    pub email: String,
+    #[serde(borrow)]
+    pub username: Cow<'a, str>,
+    #[serde(borrow)]
+    pub email: Cow<'a, str>,
     pub age: i32,
     pub is_active: bool,
 }

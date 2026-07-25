@@ -79,10 +79,7 @@ impl WriteBuffer for &mut [u8] {
     #[inline]
     fn write_byte(&mut self, b: u8) -> Result<(), Error> {
         if self.is_empty() {
-            return Err(Error::BufferFull {
-                needed: 1,
-                available: 0,
-            });
+            return Err(Error::BufferFull);
         }
         self[0] = b;
         *self = &mut core::mem::take(self)[1..];
@@ -92,10 +89,7 @@ impl WriteBuffer for &mut [u8] {
     #[inline]
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Error> {
         if (**self).len() < bytes.len() {
-            return Err(Error::BufferFull {
-                needed: bytes.len(),
-                available: (**self).len(),
-            });
+            return Err(Error::BufferFull);
         }
         self[..bytes.len()].copy_from_slice(bytes);
         *self = &mut core::mem::take(self)[bytes.len()..];
@@ -117,15 +111,33 @@ impl WriteBuffer for &mut [u8] {
 /// The `'de` lifetime ensures that any data borrowed from this buffer (e.g., strings)
 /// cannot outlive the buffer itself.
 pub struct ReadBuffer<'de> {
+    /// The underlying byte slice
     pub data: &'de [u8],
+    /// Current read position
     pub pos: usize,
+    /// Whether the underlying slice is known to be valid UTF-8
+    pub is_utf8_validated: bool,
 }
 
 impl<'de> ReadBuffer<'de> {
     /// Creates a new `ReadBuffer` from a byte slice.
     #[inline]
     pub fn new(data: &'de [u8]) -> Self {
-        Self { data, pos: 0 }
+        Self {
+            data,
+            pos: 0,
+            is_utf8_validated: false,
+        }
+    }
+
+    /// Creates a new `ReadBuffer` from a byte slice that is known to be valid UTF-8.
+    #[inline]
+    pub fn new_validated(data: &'de [u8]) -> Self {
+        Self {
+            data,
+            pos: 0,
+            is_utf8_validated: true,
+        }
     }
 
     /// Returns a slice from current position to end.
@@ -138,6 +150,24 @@ impl<'de> ReadBuffer<'de> {
     #[inline]
     pub fn peek(&self) -> u8 {
         self.data.get(self.pos).copied().unwrap_or(0)
+    }
+
+    /// Peeks at the next byte without bounds check.
+    /// # Safety
+    /// Caller must ensure `pos < data.len()`.
+    #[inline(always)]
+    pub unsafe fn peek_unchecked(&self) -> u8 {
+        unsafe { *self.data.get_unchecked(self.pos) }
+    }
+
+    /// Reads the next byte without bounds check and advances.
+    /// # Safety
+    /// Caller must ensure `pos < data.len()`.
+    #[inline(always)]
+    pub unsafe fn next_byte_unchecked(&mut self) -> u8 {
+        let b = unsafe { *self.data.get_unchecked(self.pos) };
+        self.pos += 1;
+        b
     }
 
     /// Peeks at offset without advancing.
@@ -172,6 +202,15 @@ impl<'de> ReadBuffer<'de> {
 
     /// Advances the reading position by `n` bytes.
     #[inline]
+
+    pub fn as_str(&self, bytes: &'de [u8]) -> Result<&'de str, Error> {
+        if self.is_utf8_validated {
+            Ok(unsafe { core::str::from_utf8_unchecked(bytes) })
+        } else {
+            core::str::from_utf8(bytes).map_err(|_| Error::InvalidUtf8)
+        }
+    }
+
     pub fn advance(&mut self, n: usize) {
         self.pos += n;
     }
@@ -226,20 +265,7 @@ impl<'de> ReadBuffer<'de> {
             .ok_or(Error::UnexpectedEof)?;
         self.pos += 1;
         if b != expected {
-            Err(Error::UnexpectedByte {
-                expected: match expected {
-                    b'{' => "opening '{'",
-                    b'}' => "closing '}'",
-                    b'[' => "opening '['",
-                    b']' => "closing ']'",
-                    b':' => "':'",
-                    b',' => "','",
-                    b'"' => "quote",
-                    _ => "byte",
-                },
-                got: b,
-                offset: self.pos - 1,
-            })
+            Err(Error::UnexpectedByte)
         } else {
             Ok(())
         }
@@ -253,11 +279,7 @@ impl<'de> ReadBuffer<'de> {
             return Err(Error::UnexpectedEof);
         }
         if &self.data[self.pos..end] != expected {
-            return Err(Error::UnexpectedByte {
-                expected: "expected bytes",
-                got: self.data.get(self.pos).copied().unwrap_or(0),
-                offset: self.pos,
-            });
+            return Err(Error::UnexpectedByte);
         }
         self.pos = end;
         Ok(())
@@ -268,11 +290,7 @@ impl<'de> ReadBuffer<'de> {
     pub fn expect_at(&self, offset: usize, expected: u8) -> Result<(), Error> {
         let got = self.data.get(offset).copied().ok_or(Error::UnexpectedEof)?;
         if got != expected {
-            Err(Error::UnexpectedByte {
-                expected: "byte",
-                got,
-                offset,
-            })
+            Err(Error::UnexpectedByte)
         } else {
             Ok(())
         }

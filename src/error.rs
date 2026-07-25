@@ -1,127 +1,42 @@
 use core::fmt;
 
-/// Error types for serialization and deserialization operations.
+/// Compact error code for serialization and deserialization operations.
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// Unexpected end of input buffer.
     UnexpectedEof,
-    /// Invalid UTF-8 sequence encountered.
-    InvalidUtf8 {
-        /// Byte offset where the invalid sequence was detected.
-        byte_offset: usize,
-    },
-    /// An unexpected byte was encountered.
-    UnexpectedByte {
-        /// Description of what was expected.
-        expected: &'static str,
-        /// The byte that was actually found.
-        got: u8,
-        /// Byte offset where the unexpected byte was detected.
-        offset: usize,
-    },
-    /// A numeric value overflowed its target type.
-    NumberOverflow {
-        /// The name of the target type (e.g., "u64", "i32").
-        type_name: &'static str,
-    },
-    /// A required field is missing from the input.
-    MissingField {
-        /// The name of the missing field.
-        name: &'static str,
-    },
-    /// An unknown field was encountered (if strict mode is enabled).
-    UnknownField {
-        /// The name of the unknown field.
-        name: alloc::vec::Vec<u8>,
-    },
-    /// The output buffer is full.
-    BufferFull {
-        /// Number of bytes needed.
-        needed: usize,
-        /// Number of bytes available in the buffer.
-        available: usize,
-    },
-    /// A floating point value is invalid (e.g., NaN or Infinity).
+    InvalidUtf8,
+    UnexpectedByte,
+    NumberOverflow,
+    MissingField,
+    UnknownField,
+    BufferFull,
     InvalidFloat,
-    /// The binary format magic number is invalid.
     InvalidMagic,
-    /// Unsupported binary version.
-    UnsupportedVersion {
-        /// The unsupported version number found in the input.
-        version: u16,
-    },
-    /// Extra data found after decoding the main value.
+    UnsupportedVersion,
     TrailingData,
-    /// A schema hash mismatch was detected during binary decoding.
-    SchemaMismatch {
-        /// The schema hash expected by the target type.
-        expected: u64,
-        /// The schema hash found in the input data.
-        got: u64,
-    },
-    /// A borrowed string contained an escape sequence — borrowing would
-    /// require allocating an unescaped copy. Use `String` or `Cow<str>` instead.
-    EscapeInBorrowedString {
-        /// Byte offset of the escape sequence.
-        offset: usize,
-    },
-    /// A custom error from an external source.
-    #[cfg(feature = "std")]
-    Custom(alloc::boxed::Box<dyn core::error::Error + Send + Sync>),
+    SchemaMismatch,
+    EscapeInBorrowedString,
+    Custom,
 }
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnexpectedEof => write!(f, "Unexpected end of input"),
-            Self::InvalidUtf8 { byte_offset } => {
-                write!(f, "Invalid UTF-8 at offset {}", byte_offset)
-            }
-            Self::UnexpectedByte {
-                expected,
-                got,
-                offset,
-            } => {
-                write!(
-                    f,
-                    "Unexpected byte at offset {}: expected {}, got {:#04x}",
-                    offset, expected, got
-                )
-            }
-            Self::NumberOverflow { type_name } => write!(f, "Number overflow for {}", type_name),
-            Self::MissingField { name } => write!(f, "Missing required field: {}", name),
-            Self::UnknownField { name } => {
-                write!(
-                    f,
-                    "Unknown field: {:?}",
-                    alloc::string::String::from_utf8_lossy(name)
-                )
-            }
-            Self::BufferFull { needed, available } => {
-                write!(
-                    f,
-                    "Buffer overflow: need {} bytes, have {}",
-                    needed, available
-                )
-            }
-            Self::InvalidFloat => write!(f, "Invalid float value (NaN or Infinity)"),
-            Self::InvalidMagic => write!(f, "Invalid binary magic number"),
-            Self::UnsupportedVersion { version } => {
-                write!(f, "Unsupported binary version: {:#06x}", version)
-            }
-            Self::TrailingData => write!(f, "Extra data found after decoding the main value"),
-            Self::SchemaMismatch { expected, got } => write!(
-                f,
-                "Schema hash mismatch: expected {:#018x}, got {:#018x}",
-                expected, got
-            ),
-            Self::EscapeInBorrowedString { offset } => write!(
-                f,
-                "Borrowed &str cannot contain escape sequences (at offset {}); use String or Cow<str>",
-                offset
-            ),
-            #[cfg(feature = "std")]
-            Self::Custom(e) => write!(f, "Custom error: {}", e),
+            Self::UnexpectedEof => write!(f, "UnexpectedEof"),
+            Self::InvalidUtf8 => write!(f, "InvalidUtf8"),
+            Self::UnexpectedByte => write!(f, "UnexpectedByte"),
+            Self::NumberOverflow => write!(f, "NumberOverflow"),
+            Self::MissingField => write!(f, "MissingField"),
+            Self::UnknownField => write!(f, "UnknownField"),
+            Self::BufferFull => write!(f, "BufferFull"),
+            Self::InvalidFloat => write!(f, "InvalidFloat"),
+            Self::InvalidMagic => write!(f, "InvalidMagic"),
+            Self::UnsupportedVersion => write!(f, "UnsupportedVersion"),
+            Self::TrailingData => write!(f, "TrailingData"),
+            Self::SchemaMismatch => write!(f, "SchemaMismatch"),
+            Self::EscapeInBorrowedString => write!(f, "EscapeInBorrowedString"),
+            Self::Custom => write!(f, "Custom"),
         }
     }
 }
@@ -136,13 +51,16 @@ impl core::error::Error for Error {}
 
 #[cfg(feature = "std")]
 impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::Custom(alloc::boxed::Box::new(e))
+    fn from(_: std::io::Error) -> Self {
+        Error::Custom
     }
 }
 
 impl Error {
-    pub fn missing_field(name: &'static str) -> Self {
-        Error::MissingField { name }
+    pub fn missing_field(_name: &'static str) -> Self {
+        Error::MissingField
+    }
+    pub fn custom<T: core::fmt::Display>(_msg: T) -> Self {
+        Error::Custom
     }
 }

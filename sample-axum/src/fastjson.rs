@@ -46,12 +46,13 @@ where
             )
         })?;
 
-        let val = json::decode::<T>(&bytes).map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                FastJson(ApiResponse::error(format!("JSON Decode error: {:?}", e))),
-            )
-        })?;
+        let val = json::decode::<T>(&mut bytes.to_vec(), &fastserial::arena::Arena::new())
+            .map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    FastJson(ApiResponse::error(format!("JSON Decode error: {:?}", e))),
+                )
+            })?;
 
         Ok(FastJson(val))
     }
@@ -99,12 +100,13 @@ where
             )
         })?;
 
-        let val = binary::decode_raw::<T>(&bytes).map_err(|e| {
-            (
-                StatusCode::BAD_REQUEST,
-                FastJson(ApiResponse::error(format!("Binary decode error: {:?}", e))),
-            )
-        })?;
+        let val = binary::decode_raw::<T>(&mut bytes.to_vec(), &fastserial::arena::Arena::new())
+            .map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    FastJson(ApiResponse::error(format!("Binary decode error: {:?}", e))),
+                )
+            })?;
 
         Ok(FastBinary(val))
     }

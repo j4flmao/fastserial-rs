@@ -15,13 +15,14 @@ struct AttributeTest {
 
 #[test]
 fn test_rename_and_skip_attributes() {
+    let _arena = fastserial::arena::Arena::new();
     let test = AttributeTest {
         username: "j4flmao".to_string(),
         secret: "hidden_value".to_string(),
         is_active: true,
     };
 
-    let json = encode(&test).expect("Failed to encode AttributeTest");
+    let mut json = encode(&test).expect("Failed to encode AttributeTest");
     let json_str = String::from_utf8_lossy(&json);
 
     // Check if renamed fields are present
@@ -33,7 +34,8 @@ fn test_rename_and_skip_attributes() {
     assert!(!json_str.contains("hidden_value"));
 
     // Decode back
-    let decoded: AttributeTest = decode(&json).expect("Failed to decode AttributeTest");
+    let decoded: AttributeTest =
+        decode(&mut json, &_arena).expect("Failed to decode AttributeTest");
 
     assert_eq!(decoded.username, test.username);
     assert_eq!(decoded.is_active, test.is_active);
@@ -49,6 +51,7 @@ struct NestedAttributeTest {
 
 #[test]
 fn test_nested_rename_attributes() {
+    let _arena = fastserial::arena::Arena::new();
     let test = NestedAttributeTest {
         meta: AttributeTest {
             username: "admin".to_string(),
@@ -57,7 +60,7 @@ fn test_nested_rename_attributes() {
         },
     };
 
-    let json = encode(&test).expect("Failed to encode NestedAttributeTest");
+    let mut json = encode(&test).expect("Failed to encode NestedAttributeTest");
     let json_str = String::from_utf8_lossy(&json);
 
     assert!(json_str.contains("\"meta_data\":"));
@@ -65,7 +68,8 @@ fn test_nested_rename_attributes() {
     assert!(json_str.contains("\"active_status\":"));
     assert!(!json_str.contains("\"secret\":"));
 
-    let decoded: NestedAttributeTest = decode(&json).expect("Failed to decode NestedAttributeTest");
+    let decoded: NestedAttributeTest =
+        decode(&mut json, &_arena).expect("Failed to decode NestedAttributeTest");
 
     // We can't compare the whole struct because of the skipped field
     assert_eq!(decoded.meta.username, test.meta.username);

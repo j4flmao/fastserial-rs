@@ -221,11 +221,7 @@ pub trait Format {
                 r.expect_bytes(b"false")?;
                 Ok(false)
             }
-            b => Err(Error::UnexpectedByte {
-                expected: "boolean",
-                got: b,
-                offset: r.pos,
-            }),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -326,7 +322,6 @@ const fn is_json_ws(b: u8) -> bool {
 /// back to the SIMD-accelerated scanner.
 #[inline(always)]
 pub fn skip_whitespace(r: &mut ReadBuffer<'_>) {
-    // Fast path — peek at the next byte; if it isn't whitespace we are done.
     if r.pos < r.data.len() {
         let b = unsafe { *r.data.get_unchecked(r.pos) };
         if !is_json_ws(b) {
@@ -337,6 +332,68 @@ pub fn skip_whitespace(r: &mut ReadBuffer<'_>) {
     }
     let n = simd::skip_whitespace(&r.data[r.pos..]);
     r.pos += n;
+}
+
+/// Fast path: expects `:` and skips following whitespace.
+#[inline(always)]
+pub fn skip_colon(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
+    if r.pos < r.data.len() {
+        let b = unsafe { *r.data.get_unchecked(r.pos) };
+        if b == b':' {
+            r.pos += 1;
+            if r.pos < r.data.len() {
+                let b2 = unsafe { *r.data.get_unchecked(r.pos) };
+                if b2 == b' ' {
+                    r.pos += 1;
+                } else if is_json_ws(b2) {
+                    skip_whitespace(r);
+                }
+            }
+            return Ok(());
+        }
+    }
+    r.expect_byte(b':')?;
+    skip_whitespace(r);
+    Ok(())
+}
+
+/// Fast path: skips whitespace, expects `,` or `close`, and skips following whitespace.
+/// Returns `true` if comma found, `false` if `close` found.
+#[inline(always)]
+pub fn skip_comma_or_close(r: &mut ReadBuffer<'_>, close: u8) -> Result<bool, Error> {
+    if r.pos < r.data.len() {
+        let b = unsafe { *r.data.get_unchecked(r.pos) };
+        if b == b',' {
+            r.pos += 1;
+            if r.pos < r.data.len() {
+                let b2 = unsafe { *r.data.get_unchecked(r.pos) };
+                if b2 == b' ' {
+                    r.pos += 1;
+                } else if is_json_ws(b2) {
+                    skip_whitespace(r);
+                }
+            }
+            return Ok(true);
+        } else if b == close {
+            return Ok(false);
+        } else if is_json_ws(b) {
+            // fallthrough to slow path
+        } else {
+            return Err(Error::UnexpectedByte);
+        }
+    }
+
+    skip_whitespace(r);
+    let b = r.peek();
+    if b == b',' {
+        r.advance(1);
+        skip_whitespace(r);
+        Ok(true)
+    } else if b == close {
+        Ok(false)
+    } else {
+        Err(Error::UnexpectedByte)
+    }
 }
 
 /// SWAR (SIMD-Within-A-Register) decimal-integer parser.
@@ -388,63 +445,58 @@ fn parse_8_digits_swar(chunk: u64) -> (u64, u32) {
 pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
     skip_whitespace(r);
     let start = r.pos;
-    let data = r.data;
+    let data = &*r.data;
 
     let mut n: u64 = 0;
     let mut pos = start;
 
-    // SWAR fast path: parse 8 digits at a time when we have ≥8 bytes.
+    const POW10: [u64; 9] = [
+        1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+    ];
+
+    // SWAR 8-digits per cycle
     while pos + 8 <= data.len() {
-        let chunk = u64::from_le_bytes(unsafe { *(data.as_ptr().add(pos) as *const [u8; 8]) });
-        let (val, count) = parse_8_digits_swar(chunk);
-        if count == 8 {
-            n = n
-                .checked_mul(100_000_000)
+        let chunk_slice: &[u8; 8] = data[pos..pos + 8].try_into().unwrap();
+        let chunk = u64::from_le_bytes(*chunk_slice);
+        let (val, digits) = parse_8_digits_swar(chunk);
+
+        if digits > 0 {
+            if let Some(next_n) = n
+                .checked_mul(POW10[digits as usize])
                 .and_then(|v| v.checked_add(val))
-                .ok_or(Error::NumberOverflow { type_name: "u64" })?;
-            pos += 8;
-        } else {
-            for _ in 0..count {
-                let digit = (data[pos] - b'0') as u64;
-                n = n
-                    .checked_mul(10)
-                    .and_then(|v| v.checked_add(digit))
-                    .ok_or(Error::NumberOverflow { type_name: "u64" })?;
-                pos += 1;
+            {
+                n = next_n;
+            } else {
+                return Err(Error::NumberOverflow);
             }
-            r.pos = pos;
-            if pos == start {
-                return Err(Error::UnexpectedByte {
-                    expected: "digit",
-                    got: r.peek(),
-                    offset: r.pos,
-                });
-            }
-            return Ok(n);
+            pos += digits as usize;
+        }
+
+        if digits < 8 {
+            break;
         }
     }
 
-    // Tail: scalar loop for the last <8 bytes.
+    // Scalar tail
     while pos < data.len() {
-        let b = data[pos];
+        let b = unsafe { *data.get_unchecked(pos) };
         if !b.is_ascii_digit() {
             break;
         }
         let digit = (b - b'0') as u64;
-        n = n
-            .checked_mul(10)
-            .and_then(|v| v.checked_add(digit))
-            .ok_or(Error::NumberOverflow { type_name: "u64" })?;
+
+        if let Some(next_n) = n.checked_mul(10).and_then(|v| v.checked_add(digit)) {
+            n = next_n;
+        } else {
+            return Err(Error::NumberOverflow);
+        }
         pos += 1;
     }
+
     r.pos = pos;
 
     if pos == start {
-        return Err(Error::UnexpectedByte {
-            expected: "digit",
-            got: r.peek(),
-            offset: r.pos,
-        });
+        return Err(Error::UnexpectedByte);
     }
 
     Ok(n)
@@ -453,13 +505,13 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
 #[inline(always)]
 pub fn read_signed(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
     skip_whitespace(r);
-    let data = r.data;
+    let data = &*r.data;
     let neg = r.pos < data.len() && data[r.pos] == b'-';
     if neg {
         r.pos += 1;
         let n = read_unsigned(r)?;
         if n > (i64::MAX as u64) + 1 {
-            return Err(Error::NumberOverflow { type_name: "i64" });
+            return Err(Error::NumberOverflow);
         }
         if n == (i64::MAX as u64) + 1 {
             Ok(i64::MIN)
@@ -469,7 +521,7 @@ pub fn read_signed(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
     } else {
         let n = read_unsigned(r)?;
         if n > i64::MAX as u64 {
-            return Err(Error::NumberOverflow { type_name: "i64" });
+            return Err(Error::NumberOverflow);
         }
         Ok(n as i64)
     }
@@ -479,26 +531,46 @@ pub fn read_signed(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
 pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
     skip_whitespace(r);
     let start = r.pos;
-    let data = r.data;
+    let data = &*r.data;
 
-    // Quick check for sign
-    if r.pos < data.len() && (data[r.pos] == b'+' || data[r.pos] == b'-') {
+    if r.pos >= data.len() {
+        return Err(Error::InvalidFloat);
+    }
+
+    let mut neg = false;
+    if data[r.pos] == b'-' {
+        neg = true;
+        r.pos += 1;
+    } else if data[r.pos] == b'+' {
         r.pos += 1;
     }
 
-    // Parse integer part (digits before decimal or exponent)
+    let mut m: u64 = 0;
+    let mut has_digits = false;
     let mut has_dot = false;
     let mut has_exp = false;
-    let mut has_digits = false;
+    let mut frac_digits = 0;
+    let mut fast_path_possible = true;
 
-    // Process unrolled digit groups for speed
     while r.pos < data.len() {
         let b = data[r.pos];
-
         if b.is_ascii_digit() {
             has_digits = true;
+            if fast_path_possible {
+                if let Some(next_m) = m
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add((b - b'0') as u64))
+                {
+                    m = next_m;
+                    if has_dot {
+                        frac_digits += 1;
+                    }
+                } else {
+                    fast_path_possible = false;
+                }
+            }
             r.pos += 1;
-        } else if b == b'.' && !has_dot && !has_exp && has_digits {
+        } else if b == b'.' && !has_dot {
             has_dot = true;
             r.pos += 1;
             if r.pos >= data.len() || !data[r.pos].is_ascii_digit() {
@@ -506,25 +578,50 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
             }
         } else if (b == b'e' || b == b'E') && !has_exp && has_digits {
             has_exp = true;
+            fast_path_possible = false;
             r.pos += 1;
             if r.pos < data.len() && (data[r.pos] == b'+' || data[r.pos] == b'-') {
                 r.pos += 1;
-            }
-            if r.pos >= data.len() || !data[r.pos].is_ascii_digit() {
-                return Err(Error::InvalidFloat);
             }
         } else {
             break;
         }
     }
 
-    if r.pos == start {
+    if !has_digits || r.pos == start {
         return Err(Error::InvalidFloat);
     }
 
-    let slice = core::str::from_utf8(&data[start..r.pos])
-        .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+    if fast_path_possible && !has_exp && frac_digits <= 15 {
+        let mut val = m as f64;
+        if frac_digits > 0 {
+            const POW10: [f64; 16] = [
+                1.0,
+                10.0,
+                100.0,
+                1000.0,
+                10000.0,
+                100000.0,
+                1000000.0,
+                10000000.0,
+                100000000.0,
+                1000000000.0,
+                10000000000.0,
+                100000000000.0,
+                1000000000000.0,
+                10000000000000.0,
+                100000000000000.0,
+                1000000000000000.0,
+            ];
+            val /= POW10[frac_digits as usize];
+        }
+        if neg {
+            val = -val;
+        }
+        return Ok(val);
+    }
 
+    let slice = core::str::from_utf8(&data[start..r.pos]).map_err(|_| Error::InvalidUtf8)?;
     slice.parse::<f64>().map_err(|_| Error::InvalidFloat)
 }
 
@@ -545,70 +642,56 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
 #[inline(always)]
 pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
     r.expect_byte(b'"')?;
-    let start = r.pos;
-    let data = r.data;
-
-    let end = simd::scan_quote_or_backslash(&data[r.pos..]);
+    let _start = r.pos;
+    let remaining = r.remaining_slice();
+    let end = simd::scan_quote_or_backslash(remaining);
     let abs = r.pos + end;
-    if abs >= data.len() {
-        r.pos = data.len();
+    if abs >= r.data.len() {
+        r.pos = r.data.len();
         return Err(Error::UnexpectedEof);
     }
 
-    match data[abs] {
+    match r.data[abs] {
         b'"' => {
-            let slice = core::str::from_utf8(&data[start..abs])
-                .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+            let bytes = r.peek_slice(end);
+            let slice = if r.is_utf8_validated {
+                unsafe { core::str::from_utf8_unchecked(bytes) }
+            } else {
+                core::str::from_utf8(bytes).map_err(|_| Error::InvalidUtf8)?
+            };
             r.pos = abs + 1;
             Ok(slice)
         }
-        b'\\' => Err(Error::EscapeInBorrowedString { offset: abs }),
-        other => Err(Error::UnexpectedByte {
-            expected: "string body or terminator",
-            got: other,
-            offset: abs,
-        }),
+        b'\\' => Err(Error::EscapeInBorrowedString),
+        _other => Err(Error::UnexpectedByte),
     }
 }
 
 #[inline(always)]
 pub fn read_key_fast<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
     r.expect_byte(b'"')?;
-    let start = r.pos;
-    let data = r.data;
 
     // Use SIMD to find quote or backslash faster
-    while r.pos < data.len() {
-        let remaining = &data[r.pos..];
-        if remaining.is_empty() {
-            return Err(Error::UnexpectedEof);
-        }
+    let remaining = r.remaining_slice();
+    let end = simd::scan_quote_or_backslash(remaining);
+    let abs = r.pos + end;
 
-        let end_pos = simd::scan_quote_or_backslash(remaining);
+    if abs >= r.data.len() {
+        return Err(Error::UnexpectedEof);
+    }
 
-        if end_pos == 0 {
-            return Err(Error::UnexpectedEof);
-        }
+    let ch = r.data[abs];
 
-        let ch = remaining[end_pos];
+    if ch == b'"' {
+        // Found end of key
+        let result = r.peek_slice(end);
+        r.pos = abs + 1;
+        return Ok(result);
+    }
 
-        if ch == b'"' {
-            // Found end of key
-            let end = r.pos + end_pos;
-            r.pos = end + 1;
-            return Ok(&data[start..end]);
-        }
-
-        // Found backslash in key - not allowed for keys
-        if ch == b'\\' {
-            return Err(Error::UnexpectedByte {
-                expected: "key",
-                got: b'\\',
-                offset: r.pos + end_pos,
-            });
-        }
-
-        r.pos += end_pos + 1;
+    // Found backslash in key - not allowed for keys
+    if ch == b'\\' {
+        return Err(Error::UnexpectedByte);
     }
 
     Err(Error::UnexpectedEof)
@@ -627,7 +710,7 @@ pub fn read_string_owned<'de>(r: &mut ReadBuffer<'de>) -> Result<alloc::string::
     let open_pos = r.pos;
     r.expect_byte(b'"')?;
     let start = r.pos;
-    let end = simd::scan_quote_or_backslash(&r.data[r.pos..]);
+    let end = simd::scan_quote_or_backslash(r.remaining_slice());
 
     if r.pos + end >= r.data.len() {
         return Err(Error::UnexpectedEof);
@@ -635,8 +718,8 @@ pub fn read_string_owned<'de>(r: &mut ReadBuffer<'de>) -> Result<alloc::string::
 
     // Fast path: no escapes — single allocation, single memcpy.
     if r.data[r.pos + end] == b'"' {
-        let slice = core::str::from_utf8(&r.data[start..start + end])
-            .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+        let bytes = r.peek_slice(end);
+        let slice = r.as_str(bytes)?;
         r.pos = start + end + 1;
         return Ok(alloc::string::String::from(slice));
     }
@@ -657,32 +740,37 @@ pub fn read_string_cow<'de>(
 ) -> Result<alloc::borrow::Cow<'de, str>, Error> {
     r.expect_byte(b'"')?;
     let start = r.pos;
-    let end = simd::scan_quote_or_backslash(&r.data[r.pos..]);
+    let end = simd::scan_quote_or_backslash(r.remaining_slice());
 
     if r.pos + end >= r.data.len() {
         return Err(Error::UnexpectedEof);
     }
 
     if r.data[r.pos + end] == b'"' {
-        let slice = core::str::from_utf8(&r.data[start..start + end])
-            .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?;
+        let slice = if r.is_utf8_validated {
+            unsafe { core::str::from_utf8_unchecked(r.peek_slice(end)) }
+        } else {
+            core::str::from_utf8(r.peek_slice(end)).map_err(|_| Error::InvalidUtf8)?
+        };
         r.pos = start + end + 1;
         return Ok(alloc::borrow::Cow::Borrowed(slice));
     }
-
-    let mut s = alloc::string::String::with_capacity(end + 16);
-    s.push_str(
-        core::str::from_utf8(&r.data[start..start + end])
-            .map_err(|_| Error::InvalidUtf8 { byte_offset: start })?,
-    );
-
+    let mut write_pos = start + end;
     r.pos += end;
 
     while r.pos < r.data.len() {
         let b = r.data[r.pos];
         if b == b'"' {
             r.pos += 1;
-            return Ok(alloc::borrow::Cow::Owned(s));
+            let key_bytes = unsafe {
+                core::slice::from_raw_parts(r.data.as_ptr().add(start), write_pos - start)
+            };
+            let slice = if r.is_utf8_validated {
+                unsafe { core::str::from_utf8_unchecked(key_bytes) }
+            } else {
+                core::str::from_utf8(key_bytes).map_err(|_| Error::InvalidUtf8)?
+            };
+            return Ok(alloc::borrow::Cow::Borrowed(slice));
         }
 
         if b == b'\\' {
@@ -693,14 +781,54 @@ pub fn read_string_cow<'de>(
             let esc = r.data[r.pos];
             r.pos += 1;
             match esc {
-                b'"' => s.push('"'),
-                b'\\' => s.push('\\'),
-                b'/' => s.push('/'),
-                b'b' => s.push('\x08'),
-                b'f' => s.push('\x0c'),
-                b'n' => s.push('\n'),
-                b'r' => s.push('\r'),
-                b't' => s.push('\t'),
+                b'"' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'"');
+                    }
+                    write_pos += 1;
+                }
+                b'\\' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\\');
+                    }
+                    write_pos += 1;
+                }
+                b'/' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'/');
+                    }
+                    write_pos += 1;
+                }
+                b'b' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\x08');
+                    }
+                    write_pos += 1;
+                }
+                b'f' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\x0c');
+                    }
+                    write_pos += 1;
+                }
+                b'n' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\n');
+                    }
+                    write_pos += 1;
+                }
+                b'r' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\r');
+                    }
+                    write_pos += 1;
+                }
+                b't' => {
+                    unsafe {
+                        (r.data.as_ptr() as *mut u8).add(write_pos).write(b'\t');
+                    }
+                    write_pos += 1;
+                }
                 b'u' => {
                     if r.pos + 4 > r.data.len() {
                         return Err(Error::UnexpectedEof);
@@ -708,35 +836,46 @@ pub fn read_string_cow<'de>(
                     let hex = &r.data[r.pos..r.pos + 4];
                     let code = unescape_hex(hex)?;
                     if let Some(c) = core::char::from_u32(code) {
-                        s.push(c);
+                        let mut buf = [0; 4];
+                        let s_char = c.encode_utf8(&mut buf);
+                        let bytes = s_char.as_bytes();
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(
+                                bytes.as_ptr(),
+                                (r.data.as_ptr() as *mut u8).add(write_pos),
+                                bytes.len(),
+                            );
+                        }
+                        write_pos += bytes.len();
                     } else {
-                        return Err(Error::InvalidUtf8 {
-                            byte_offset: r.pos - 2,
-                        });
+                        return Err(Error::InvalidUtf8);
                     }
                     r.pos += 4;
                 }
                 _ => {
-                    return Err(Error::UnexpectedByte {
-                        expected: "escape sequence",
-                        got: esc,
-                        offset: r.pos - 1,
-                    });
+                    return Err(Error::UnexpectedByte);
                 }
             }
         } else {
             let chunk_start = r.pos;
             let next = simd::scan_quote_or_backslash(&r.data[r.pos..]);
             if next > 0 {
-                s.push_str(
-                    core::str::from_utf8(&r.data[chunk_start..chunk_start + next]).map_err(
-                        |_| Error::InvalidUtf8 {
-                            byte_offset: chunk_start,
-                        },
-                    )?,
-                );
+                // copy the chunk down if write_pos != chunk_start
+                if write_pos != chunk_start {
+                    unsafe {
+                        std::slice::from_raw_parts_mut(r.data.as_ptr() as *mut u8, r.data.len())
+                    }
+                    .copy_within(chunk_start..chunk_start + next, write_pos);
+                }
+                write_pos += next;
+                r.pos += next;
+            } else {
+                unsafe {
+                    (r.data.as_ptr() as *mut u8).add(write_pos).write(b);
+                }
+                write_pos += 1;
+                r.pos += 1;
             }
-            r.pos += next;
         }
     }
 
@@ -752,11 +891,7 @@ fn unescape_hex(hex: &[u8]) -> Result<u32, Error> {
             b'a'..=b'f' => (b - b'a' + 10) as u32,
             b'A'..=b'F' => (b - b'A' + 10) as u32,
             _ => {
-                return Err(Error::UnexpectedByte {
-                    expected: "hex digit",
-                    got: b,
-                    offset: 0,
-                });
+                return Err(Error::UnexpectedByte);
             }
         };
         code = (code << 4) | digit;
@@ -771,15 +906,13 @@ pub fn read_bytes<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
 pub fn read_bytes_impl<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
     r.expect_byte(b'"')?;
     let start = r.pos;
-    let end = simd::scan_quote_or_backslash(&r.data[r.pos..]);
+    let end = simd::scan_quote_or_backslash(r.remaining_slice());
 
     if r.pos + end >= r.data.len() {
         return Err(Error::UnexpectedEof);
     }
-
     r.expect_at(r.pos + end, b'"')?;
-    r.pos = start;
-    let result = &r.data[start..start + end];
+    let result = r.peek_slice(end);
     r.pos = start + end + 1;
     Ok(result)
 }
@@ -812,11 +945,7 @@ pub fn skip_value(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
         b'"' => skip_string(r),
         b'[' => skip_container(r, b'[', b']'),
         b'{' => skip_container(r, b'{', b'}'),
-        b => Err(Error::UnexpectedByte {
-            expected: "value",
-            got: b,
-            offset: r.pos,
-        }),
+        _b => Err(Error::UnexpectedByte),
     }
 }
 
@@ -880,16 +1009,6 @@ fn skip_container(r: &mut ReadBuffer<'_>, open: u8, close: u8) -> Result<(), Err
         } else {
             r.pos += 1;
         }
-    }
-    Ok(())
-}
-
-#[inline]
-pub fn skip_comma_or_close(r: &mut ReadBuffer<'_>, _close: u8) -> Result<(), Error> {
-    skip_whitespace(r);
-    if r.peek() == b',' {
-        r.advance(1);
-        skip_whitespace(r);
     }
     Ok(())
 }
@@ -1145,8 +1264,33 @@ pub fn read_f64(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
     read_float(r)
 }
 
+#[inline(always)]
 pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
     skip_whitespace(r);
+    let remaining = r.remaining_slice();
+    if remaining.len() >= 5 {
+        let p = remaining.as_ptr();
+        let first = unsafe { *p };
+        if first == b't' {
+            let val = unsafe { core::ptr::read_unaligned(p as *const u32) };
+            if val == u32::from_ne_bytes(*b"true") {
+                r.pos += 4;
+                return Ok(true);
+            }
+        } else if first == b'f' {
+            let val = unsafe { core::ptr::read_unaligned(p.add(1) as *const u32) };
+            if val == u32::from_ne_bytes(*b"alse") {
+                r.pos += 5;
+                return Ok(false);
+            }
+        }
+    } else if remaining.len() >= 4 {
+        if remaining == b"true" {
+            r.pos += 4;
+            return Ok(true);
+        }
+    }
+
     match r.peek() {
         b't' => {
             r.expect_bytes(b"true")?;
@@ -1156,16 +1300,21 @@ pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
             r.expect_bytes(b"false")?;
             Ok(false)
         }
-        b => Err(Error::UnexpectedByte {
-            expected: "boolean",
-            got: b,
-            offset: r.pos,
-        }),
+        _b => Err(Error::UnexpectedByte),
     }
 }
 
+#[inline(always)]
 pub fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
     skip_whitespace(r);
+    let remaining = r.remaining_slice();
+    if remaining.len() >= 4 {
+        let val = unsafe { core::ptr::read_unaligned(remaining.as_ptr() as *const u32) };
+        if val == u32::from_ne_bytes(*b"null") {
+            r.pos += 4;
+            return Ok(());
+        }
+    }
     r.expect_bytes(b"null")
 }
 
@@ -1220,8 +1369,21 @@ pub fn binary_search_key(key: &[u8], sorted_keys: &[&str]) -> Option<usize> {
 #[inline(always)]
 fn quick_hash(key: &[u8]) -> u32 {
     let mut hash: u32 = 5381;
-    for &b in key {
-        hash = hash.wrapping_mul(33).wrapping_add(b as u32);
+    let mut i = 0;
+    while i + 4 <= key.len() {
+        let chunk = unsafe { core::ptr::read_unaligned(key.as_ptr().add(i) as *const u32) };
+        let bytes = chunk.to_le_bytes();
+        hash = hash.wrapping_mul(33).wrapping_add(bytes[0] as u32);
+        hash = hash.wrapping_mul(33).wrapping_add(bytes[1] as u32);
+        hash = hash.wrapping_mul(33).wrapping_add(bytes[2] as u32);
+        hash = hash.wrapping_mul(33).wrapping_add(bytes[3] as u32);
+        i += 4;
+    }
+    while i < key.len() {
+        hash = hash
+            .wrapping_mul(33)
+            .wrapping_add(unsafe { *key.get_unchecked(i) } as u32);
+        i += 1;
     }
     hash
 }

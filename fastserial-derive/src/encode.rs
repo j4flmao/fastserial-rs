@@ -39,8 +39,8 @@ fn parse_field_attrs(field: &syn::Field) -> FieldInfo {
     let mut skip = false;
 
     for attr in &field.attrs {
-        if attr.path().is_ident("fastserial") {
-            let _ = attr.parse_nested_meta(|meta| {
+        if attr.meta.path().is_ident("fastserial") {
+            let _ = attr.parse_nested_meta(|meta: syn::meta::ParseNestedMeta| {
                 if meta.path.is_ident("skip") {
                     skip = true;
                 } else if meta.path.is_ident("rename") {
@@ -74,8 +74,8 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> EnumTagging {
     let mut untagged = false;
 
     for attr in attrs {
-        if attr.path().is_ident("fastserial") {
-            let _ = attr.parse_nested_meta(|meta| {
+        if attr.meta.path().is_ident("fastserial") {
+            let _ = attr.parse_nested_meta(|meta: syn::meta::ParseNestedMeta| {
                 if meta.path.is_ident("tag") {
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     tag = Some(lit.value());
@@ -106,8 +106,8 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> EnumTagging {
 fn get_variant_name(variant: &syn::Variant) -> String {
     let mut name = variant.ident.to_string();
     for attr in &variant.attrs {
-        if attr.path().is_ident("fastserial") {
-            let _ = attr.parse_nested_meta(|meta| {
+        if attr.meta.path().is_ident("fastserial") {
+            let _ = attr.parse_nested_meta(|meta: syn::meta::ParseNestedMeta| {
                 if meta.path.is_ident("rename") {
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     name = lit.value();

@@ -55,7 +55,7 @@
 //! let json_data = json::encode(&user)?;
 //!
 //! // Deserialize back to struct
-//! let decoded: User = json::decode(&json_data)?;
+//! let mut json_data = json_data; let _arena = fastserial::arena::Arena::new(); let decoded: User = json::decode(&mut json_data, &_arena)?;
 //!
 //! assert_eq!(user, decoded);
 //! # Ok(())
@@ -97,7 +97,7 @@
 //! # fn main() -> Result<(), fastserial::Error> {
 //! let p = Point { x: 10, y: 20 };
 //! let encoded = json::encode(&p)?;
-//! let decoded: Point = json::decode(&encoded)?;
+//! let mut encoded = encoded; let _arena = fastserial::arena::Arena::new(); let decoded: Point = json::decode(&mut encoded, &_arena)?;
 //! assert_eq!(p.x, decoded.x);
 //! # Ok(())
 //! # }
@@ -126,7 +126,6 @@ pub mod schema;
 pub mod simd;
 
 /// A small chunked bump arena (gated behind `feature = "arena"`).
-#[cfg(feature = "arena")]
 pub mod arena;
 
 mod error;
@@ -213,14 +212,17 @@ pub trait Decode<'de>: Sized {
     /// The `'de` lifetime represents the input buffer's lifetime. This enables:
     /// - Zero-copy deserialization for `&str`, `&[u8]` types
     /// - Borrowed strings that reference the original input
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error>;
+    fn decode(r: &mut io::ReadBuffer<'de>, allocator: &'de arena::Arena) -> Result<Self, Error>;
 
     /// Decodes with a specific format.
     ///
     /// Default implementation calls `decode()`. Override this for custom format handling.
     #[inline(always)]
-    fn decode_with_format<F: Format>(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
-        Self::decode(r)
+    fn decode_with_format<F: Format>(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de arena::Arena,
+    ) -> Result<Self, Error> {
+        Self::decode(r, _arena)
     }
 }
 
@@ -381,7 +383,7 @@ pub mod json {
     /// ```rust
     /// use fastserial::json;
     ///
-    /// let num: i32 = json::decode(b"42").unwrap();
+    /// let _arena = fastserial::arena::Arena::new(); let num: i32 = json::decode(&mut b"42".to_vec(), &_arena).unwrap();
     /// assert_eq!(num, 42);
     /// ```
     ///
@@ -395,7 +397,7 @@ pub mod json {
     /// }
     ///
     /// let input = r#"{"text":"Hello"}"#;
-    /// let msg: Message = json::decode(input.as_bytes()).unwrap();
+    /// let mut bytes = input.as_bytes().to_vec(); let _arena = fastserial::arena::Arena::new(); let msg: Message = json::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(msg.text, "Hello");
     /// ```
     ///
@@ -407,13 +409,19 @@ pub mod json {
     /// - Invalid data types for target fields
     /// - Invalid UTF-8 in strings
     /// - Trailing data after complete JSON value
-    pub fn decode<'de, T: Decode<'de>>(input: &'de [u8]) -> Result<T, Error> {
+    pub fn decode<'de, T: Decode<'de>>(
+        input: &'de mut [u8],
+        arena: &'de crate::arena::Arena,
+    ) -> Result<T, Error> {
+        let len = input.len();
         let mut r = io::ReadBuffer::new(input);
-        let val = T::decode(&mut r)?;
+        let val = T::decode(&mut r, arena)?;
         codec::json::skip_whitespace(&mut r);
-        if !r.is_eof() {
+
+        if r.pos < len {
             return Err(Error::TrailingData);
         }
+
         Ok(val)
     }
 
@@ -427,11 +435,23 @@ pub mod json {
     /// ```rust
     /// use fastserial::json;
     ///
-    /// let num: i32 = json::decode_str("42").unwrap();
+    /// let mut s = String::from("42"); let _arena = fastserial::arena::Arena::new(); let num: i32 = json::decode_str(&mut s, &_arena).unwrap();
     /// assert_eq!(num, 42);
     /// ```
-    pub fn decode_str<'de, T: Decode<'de>>(input: &'de str) -> Result<T, Error> {
-        decode(input.as_bytes())
+    pub fn decode_str<'de, T: Decode<'de>>(
+        input: &'de mut str,
+        arena: &'de crate::arena::Arena,
+    ) -> Result<T, Error> {
+        let len = input.len();
+        let mut r = io::ReadBuffer::new_validated(unsafe { input.as_bytes_mut() });
+        let val = T::decode(&mut r, arena)?;
+        codec::json::skip_whitespace(&mut r);
+
+        if r.pos < len {
+            return Err(Error::TrailingData);
+        }
+
+        Ok(val)
     }
 
     /// Encodes a value to pretty-printed JSON with indentation.
@@ -470,7 +490,9 @@ pub mod json {
     /// ```
     pub fn encode_pretty<T: Encode>(val: &T) -> Result<alloc::vec::Vec<u8>, Error> {
         let compact = encode(val)?;
-        let value: crate::Value = decode(&compact)?;
+        let mut compact = compact;
+        let arena = crate::arena::Arena::new();
+        let value: crate::Value = decode(&mut compact, &arena)?;
         let mut buf = alloc::vec::Vec::with_capacity(compact.len() * 2);
         pretty_print_value(&value, &mut buf, 0)?;
         Ok(buf)
@@ -622,7 +644,7 @@ pub mod binary {
     /// let user = User { id: 1, name: "Alice".into() };
     /// let bytes = binary::encode(&user).unwrap();
     /// assert!(bytes.starts_with(b"FBIN"));
-    /// let decoded: User = binary::decode(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: User = binary::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(user, decoded);
     /// ```
     ///
@@ -687,7 +709,7 @@ pub mod binary {
     ///
     /// let original = Data { id: 100 };
     /// let bytes = binary::encode(&original).unwrap();
-    /// let decoded: Data = binary::decode(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: Data = binary::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(original, decoded);
     /// ```
     ///
@@ -698,7 +720,10 @@ pub mod binary {
     /// - `UnsupportedVersion`: Version != 0x0001
     /// - `UnexpectedEof`: Input too short
     /// - Standard deserialization errors
-    pub fn decode<'de, T: Decode<'de>>(input: &'de [u8]) -> Result<T, Error> {
+    pub fn decode<'de, T: Decode<'de>>(
+        input: &'de mut [u8],
+        arena: &'de crate::arena::Arena,
+    ) -> Result<T, Error> {
         if input.len() < 16 {
             return Err(Error::UnexpectedEof);
         }
@@ -707,11 +732,11 @@ pub mod binary {
         }
         let version = u16::from_le_bytes([input[4], input[5]]);
         if version != VERSION {
-            return Err(Error::UnsupportedVersion { version });
+            return Err(Error::UnsupportedVersion);
         }
         // TODO: Validate T::SCHEMA_HASH against input[6..14]
         let mut r = io::ReadBuffer::new(&input[16..]);
-        let val = T::decode_with_format::<codec::BinaryFormat>(&mut r)?;
+        let val = T::decode_with_format::<codec::BinaryFormat>(&mut r, arena)?;
         if !r.is_eof() {
             return Err(Error::TrailingData);
         }
@@ -769,7 +794,7 @@ pub mod binary {
     ///
     /// let original = Data { id: 100 };
     /// let bytes = binary::encode_raw(&original).unwrap();
-    /// let decoded: Data = binary::decode_raw(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: Data = binary::decode_raw(&mut bytes, &_arena).unwrap();
     /// assert_eq!(original, decoded);
     /// ```
     ///
@@ -779,9 +804,12 @@ pub mod binary {
     /// - Input is insufficient or corrupted
     /// - Type doesn't match encoded format
     /// - Trailing data after complete value
-    pub fn decode_raw<'de, T: Decode<'de>>(input: &'de [u8]) -> Result<T, Error> {
+    pub fn decode_raw<'de, T: Decode<'de>>(
+        input: &'de mut [u8],
+        arena: &'de crate::arena::Arena,
+    ) -> Result<T, Error> {
         let mut r = io::ReadBuffer::new(input);
-        let val = T::decode(&mut r)?;
+        let val = T::decode(&mut r, arena)?;
         if !r.is_eof() {
             return Err(Error::TrailingData);
         }
@@ -817,13 +845,16 @@ mod option_impl {
 
     impl<'de, T: Decode<'de>> Decode<'de> for Option<T> {
         #[inline]
-        fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+        fn decode(
+            r: &mut io::ReadBuffer<'de>,
+            arena: &'de crate::arena::Arena,
+        ) -> Result<Self, Error> {
             codec::json::skip_whitespace(r);
             if r.peek() == b'n' {
                 r.expect_bytes(b"null")?;
                 Ok(None)
             } else {
-                Ok(Some(T::decode(r)?))
+                Ok(Some(T::decode(r, arena)?))
             }
         }
     }
@@ -869,7 +900,10 @@ mod vec_impl {
 
     impl<'de, T: Decode<'de>> Decode<'de> for alloc::vec::Vec<T> {
         #[inline]
-        fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+        fn decode(
+            r: &mut io::ReadBuffer<'de>,
+            arena: &'de crate::arena::Arena,
+        ) -> Result<Self, Error> {
             r.expect_byte(b'[')?;
             codec::json::skip_whitespace(r);
             if r.peek() == b']' {
@@ -884,7 +918,7 @@ mod vec_impl {
             let mut vec = alloc::vec::Vec::with_capacity(est.clamp(4, 4096));
 
             loop {
-                vec.push(T::decode(r)?);
+                vec.push(T::decode(r, arena)?);
                 codec::json::skip_comma_or_close(r, b']')?;
                 if r.peek() == b']' {
                     r.advance(1);
@@ -915,7 +949,7 @@ macro_rules! impl_primitive {
 
             impl<'de> Decode<'de> for $ty {
                 #[inline(always)]
-                fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+                fn decode(r: &mut io::ReadBuffer<'de>, _arena: &'de crate::arena::Arena) -> Result<Self, Error> {
                     codec::json::$read_fn(r)
                 }
             }
@@ -948,7 +982,10 @@ impl Encode for () {
 
 impl<'de> Decode<'de> for () {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_null(r)
     }
 }
@@ -969,7 +1006,10 @@ impl Encode for alloc::string::String {
 
 impl<'de> Decode<'de> for alloc::string::String {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_string_owned(r)
     }
 }
@@ -990,7 +1030,10 @@ impl Encode for &str {
 
 impl<'de> Decode<'de> for &'de str {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_string(r)
     }
 }
@@ -1011,7 +1054,10 @@ impl Encode for &[u8] {
 
 impl<'de> Decode<'de> for &'de [u8] {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_bytes(r)
     }
 }
@@ -1042,13 +1088,14 @@ mod chrono_impl {
 
     impl<'de> Decode<'de> for DateTime<Utc> {
         #[inline]
-        fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+        fn decode(
+            r: &mut io::ReadBuffer<'de>,
+            _arena: &'de crate::arena::Arena,
+        ) -> Result<Self, Error> {
             let s = codec::json::read_string(r)?;
             DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.with_timezone(&Utc))
-                .map_err(|_| Error::InvalidUtf8 {
-                    byte_offset: r.get_pos(),
-                })
+                .map_err(|_| Error::InvalidUtf8)
         }
     }
 }
@@ -1081,7 +1128,10 @@ mod hashmap_impl {
 
     impl<'de, V: Decode<'de>> Decode<'de> for HashMap<alloc::string::String, V> {
         #[inline]
-        fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+        fn decode(
+            r: &mut io::ReadBuffer<'de>,
+            arena: &'de crate::arena::Arena,
+        ) -> Result<Self, Error> {
             codec::json::skip_whitespace(r);
             r.expect_byte(b'{')?;
             let mut map = HashMap::new();
@@ -1095,7 +1145,7 @@ mod hashmap_impl {
                 let key = codec::json::read_string_cow(r)?.into_owned();
                 codec::json::skip_whitespace(r);
                 r.expect_byte(b':')?;
-                let val = V::decode(r)?;
+                let val = V::decode(r, arena)?;
                 map.insert(key, val);
                 codec::json::skip_comma_or_close(r, b'}')?;
                 if r.peek() == b'}' {
@@ -1135,7 +1185,10 @@ mod btreemap_impl {
 
     impl<'de, V: Decode<'de>> Decode<'de> for BTreeMap<alloc::string::String, V> {
         #[inline]
-        fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
+        fn decode(
+            r: &mut io::ReadBuffer<'de>,
+            arena: &'de crate::arena::Arena,
+        ) -> Result<Self, Error> {
             codec::json::skip_whitespace(r);
             r.expect_byte(b'{')?;
             let mut map = BTreeMap::new();
@@ -1149,7 +1202,7 @@ mod btreemap_impl {
                 let key = codec::json::read_string_cow(r)?.into_owned();
                 codec::json::skip_whitespace(r);
                 r.expect_byte(b':')?;
-                let val = V::decode(r)?;
+                let val = V::decode(r, arena)?;
                 map.insert(key, val);
                 codec::json::skip_comma_or_close(r, b'}')?;
                 if r.peek() == b'}' {
@@ -1177,11 +1230,9 @@ macro_rules! impl_tuple {
 
         impl<'de, $($T: Decode<'de>),+> Decode<'de> for ($($T,)+) {
             #[inline]
-            fn decode(r: &mut io::ReadBuffer<'de>) -> Result<Self, Error> {
-                codec::json::skip_whitespace(r);
+            fn decode(r: &mut io::ReadBuffer<'de>, allocator: &'de crate::arena::Arena) -> Result<Self, Error> {
                 r.expect_byte(b'[')?;
-                impl_tuple!(@decode r $($idx $T),+);
-                codec::json::skip_whitespace(r);
+                impl_tuple!(@decode r allocator $($idx $T),+);
                 r.expect_byte(b']')?;
                 Ok(($($T,)+))
             }
@@ -1196,14 +1247,14 @@ macro_rules! impl_tuple {
         )*
     };
 
-    (@decode $r:ident $first_idx:tt $first_T:ident $(, $idx:tt $T:ident)*) => {
+    (@decode $r:ident $allocator:ident $first_idx:tt $first_T:ident $(, $idx:tt $T:ident)*) => {
         codec::json::skip_whitespace($r);
         #[allow(non_snake_case)]
-        let $first_T = $first_T::decode($r)?;
+        let $first_T = $first_T::decode($r, $allocator)?;
         $(
             codec::json::skip_comma_or_close($r, b']')?;
             #[allow(non_snake_case)]
-            let $T = $T::decode($r)?;
+            let $T = $T::decode($r, $allocator)?;
         )*
     };
 }
@@ -1224,4 +1275,22 @@ impl_tuple!(0 A, 1 B, 2 C, 3 D, 4 E2, 5 F2, 6 G, 7 H, 8 I2, 9 J, 10 K, 11 L);
 #[cfg(feature = "msgpack")]
 pub mod msgpack {
     pub use crate::codec::msgpack::*;
+}
+
+impl<'a> Encode for alloc::borrow::Cow<'a, str> {
+    const SCHEMA_HASH: u64 = <&str as Encode>::SCHEMA_HASH ^ 0x12345678;
+    #[inline]
+    fn encode<W: crate::io::WriteBuffer>(&self, w: &mut W) -> Result<(), Error> {
+        self.as_ref().encode(w)
+    }
+}
+impl<'de> Decode<'de> for alloc::borrow::Cow<'de, str> {
+    #[inline]
+    fn decode(
+        r: &mut crate::io::ReadBuffer<'de>,
+        arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
+        let s = <&'de str>::decode(r, arena)?;
+        Ok(alloc::borrow::Cow::Borrowed(s))
+    }
 }

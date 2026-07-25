@@ -20,34 +20,40 @@ struct TestPost {
 
 #[test]
 fn test_user_json_serialize() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let user = TestUser {
         id: 1,
         username: "john".into(),
         email: "john@example.com".into(),
     };
 
-    let encoded = json::encode(&user).unwrap();
-    let decoded: TestUser = json::decode(&encoded).unwrap();
+    let mut encoded = json::encode(&user).unwrap();
+    let decoded: TestUser = json::decode(&mut encoded, &_arena).unwrap();
 
     assert_eq!(user.username, decoded.username);
 }
 
 #[test]
 fn test_user_binary_serialize() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let user = TestUser {
         id: 1,
         username: "john".into(),
         email: "john@example.com".into(),
     };
 
-    let encoded = binary::encode_raw(&user).unwrap();
-    let decoded: TestUser = binary::decode_raw(&encoded).unwrap();
+    let mut encoded = binary::encode_raw(&user).unwrap();
+    let decoded: TestUser = binary::decode_raw(&mut encoded, &_arena).unwrap();
 
     assert_eq!(user.email, decoded.email);
 }
 
 #[test]
 fn test_post_with_vec_json() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let post = TestPost {
         id: 1,
         title: "Hello".into(),
@@ -56,14 +62,16 @@ fn test_post_with_vec_json() {
         tags: vec!["rust".into(), "fast".into()],
     };
 
-    let encoded = json::encode(&post).unwrap();
-    let decoded: TestPost = json::decode(&encoded).unwrap();
+    let mut encoded = json::encode(&post).unwrap();
+    let decoded: TestPost = json::decode(&mut encoded, &_arena).unwrap();
 
     assert_eq!(post.tags.len(), decoded.tags.len());
 }
 
 #[test]
 fn test_post_with_vec_binary() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let post = TestPost {
         id: 1,
         title: "Hello".into(),
@@ -72,14 +80,16 @@ fn test_post_with_vec_binary() {
         tags: vec!["rust".into(), "fast".into()],
     };
 
-    let encoded = binary::encode_raw(&post).unwrap();
-    let decoded: TestPost = binary::decode_raw(&encoded).unwrap();
+    let mut encoded = binary::encode_raw(&post).unwrap();
+    let decoded: TestPost = binary::decode_raw(&mut encoded, &_arena).unwrap();
 
     assert_eq!(post.tags.len(), decoded.tags.len());
 }
 
 #[test]
 fn test_vec_users_json() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let users: Vec<TestUser> = (0..100)
         .map(|i| TestUser {
             id: i,
@@ -88,14 +98,16 @@ fn test_vec_users_json() {
         })
         .collect();
 
-    let encoded = json::encode(&users).unwrap();
-    let decoded: Vec<TestUser> = json::decode(&encoded).unwrap();
+    let mut encoded = json::encode(&users).unwrap();
+    let decoded: Vec<TestUser> = json::decode(&mut encoded, &_arena).unwrap();
 
     assert_eq!(users.len(), decoded.len());
 }
 
 #[test]
 fn test_vec_users_binary() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let users: Vec<TestUser> = (0..100)
         .map(|i| TestUser {
             id: i,
@@ -104,14 +116,16 @@ fn test_vec_users_binary() {
         })
         .collect();
 
-    let encoded = binary::encode_raw(&users).unwrap();
-    let decoded: Vec<TestUser> = binary::decode_raw(&encoded).unwrap();
+    let mut encoded = binary::encode_raw(&users).unwrap();
+    let decoded: Vec<TestUser> = binary::decode_raw(&mut encoded, &_arena).unwrap();
 
     assert_eq!(users.len(), decoded.len());
 }
 
 #[test]
 fn test_size_comparison_single() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let user = TestUser {
         id: 1,
         username: "johndoe".into(),
@@ -130,6 +144,8 @@ fn test_size_comparison_single() {
 
 #[test]
 fn test_size_comparison_vector() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let users: Vec<TestUser> = (0..100)
         .map(|i| TestUser {
             id: i,
@@ -154,6 +170,8 @@ fn test_size_comparison_vector() {
 
 #[test]
 fn test_option_field() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     #[derive(Encode, Decode, PartialEq, Debug)]
     struct WithOption {
         id: u64,
@@ -173,17 +191,19 @@ fn test_option_field() {
         description: None,
     };
 
-    let encoded = json::encode(&with_some).unwrap();
-    let decoded: WithOption = json::decode(&encoded).unwrap();
+    let mut encoded = json::encode(&with_some).unwrap();
+    let decoded: WithOption = json::decode(&mut encoded, &_arena).unwrap();
     assert!(decoded.description.is_some());
 
-    let encoded = json::encode(&with_none).unwrap();
-    let decoded: WithOption = json::decode(&encoded).unwrap();
+    let mut encoded = json::encode(&with_none).unwrap();
+    let decoded: WithOption = json::decode(&mut encoded, &_arena).unwrap();
     assert!(decoded.description.is_none());
 }
 
 #[test]
 fn test_binary_vs_json_performance() {
+    let _arena = fastserial::arena::Arena::new();
+    let _arena = fastserial::arena::Arena::new();
     let user = TestUser {
         id: 1,
         username: "john".into(),
