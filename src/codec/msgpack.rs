@@ -333,7 +333,7 @@ impl Format for MsgPackFormat {
     fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
         match r.next_byte()? {
             0xC0 => Ok(()),
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -364,7 +364,7 @@ impl Format for MsgPackFormat {
                 r.advance(4);
                 Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
             }
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -398,7 +398,7 @@ impl Format for MsgPackFormat {
                 r.advance(4);
                 Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize)
             }
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -564,7 +564,7 @@ impl Format for MsgPackFormat {
                 r.advance(len);
                 Ok(())
             }
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 }
