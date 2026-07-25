@@ -12,7 +12,7 @@ struct SingleField {
 fn test_single_field_struct() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = SingleField { value: 42 };
+    let s = SingleField { value: 42 };
     let mut json = encode(&s).unwrap();
     let decoded: SingleField = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
@@ -38,7 +38,7 @@ struct ManyFields {
 fn test_many_fields_struct() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = ManyFields {
+    let s = ManyFields {
         a: 1,
         b: 2,
         c: 3,
@@ -68,7 +68,7 @@ struct WithOptionals {
 fn test_struct_all_options_present() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = WithOptionals {
+    let s = WithOptionals {
         name: "Alice".to_string(),
         age: Some(30),
         email: Some("alice@example.com".to_string()),
@@ -82,7 +82,7 @@ fn test_struct_all_options_present() {
 fn test_struct_all_options_none() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = WithOptionals {
+    let s = WithOptionals {
         name: "Bob".to_string(),
         age: None,
         email: None,
@@ -104,7 +104,7 @@ struct WithVecs {
 fn test_struct_with_populated_vecs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = WithVecs {
+    let s = WithVecs {
         tags: vec!["rust".to_string(), "fast".to_string()],
         scores: vec![100, 95, 88],
     };
@@ -117,7 +117,7 @@ fn test_struct_with_populated_vecs() {
 fn test_struct_with_empty_vecs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = WithVecs {
+    let s = WithVecs {
         tags: vec![],
         scores: vec![],
     };
@@ -144,7 +144,7 @@ struct Outer {
 fn test_nested_struct() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Outer {
+    let s = Outer {
         name: "point".to_string(),
         position: Inner { x: 10, y: 20 },
     };
@@ -176,7 +176,7 @@ struct Level1 {
 fn test_deeply_nested_structs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Level1 {
+    let s = Level1 {
         name: "root".to_string(),
         child: Level2 {
             deep: Level3 {
@@ -207,7 +207,7 @@ struct Container {
 fn test_struct_with_vec_of_structs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Container {
+    let s = Container {
         items: vec![
             Item {
                 id: 1,
@@ -232,7 +232,7 @@ fn test_struct_with_vec_of_structs() {
 fn test_struct_with_empty_vec_of_structs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Container { items: vec![] };
+    let s = Container { items: vec![] };
     let mut json = encode(&s).unwrap();
     let decoded: Container = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
@@ -250,7 +250,7 @@ struct TextContent {
 fn test_struct_with_special_chars_in_strings() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = TextContent {
+    let s = TextContent {
         title: "Hello \"World\"".to_string(),
         body: "Line1\nLine2\tTabbed\\Backslash".to_string(),
     };
@@ -263,7 +263,7 @@ fn test_struct_with_special_chars_in_strings() {
 fn test_struct_with_empty_strings() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = TextContent {
+    let s = TextContent {
         title: "".to_string(),
         body: "".to_string(),
     };
@@ -276,7 +276,7 @@ fn test_struct_with_empty_strings() {
 fn test_struct_with_unicode_strings() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = TextContent {
+    let s = TextContent {
         title: "こんにちは".to_string(),
         body: "Emoji: 🦀🚀💡".to_string(),
     };
@@ -297,7 +297,7 @@ struct FloatStruct {
 fn test_struct_with_floats() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = FloatStruct { x: 1.5, y: 2.75 };
+    let s = FloatStruct { x: 1.5, y: 2.75 };
     let mut json = encode(&s).unwrap();
     let decoded: FloatStruct = decode(&mut json, &_arena).unwrap();
     assert!((s.x - decoded.x).abs() < 1e-6);
@@ -308,7 +308,7 @@ fn test_struct_with_floats() {
 fn test_struct_with_zero_floats() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = FloatStruct { x: 0.0, y: 0.0 };
+    let s = FloatStruct { x: 0.0, y: 0.0 };
     let mut json = encode(&s).unwrap();
     let decoded: FloatStruct = decode(&mut json, &_arena).unwrap();
     assert_eq!(decoded.x, 0.0);
@@ -329,7 +329,7 @@ struct Complex {
 fn test_complex_struct() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Complex {
+    let s = Complex {
         id: 100,
         tags: vec!["a".to_string(), "b".to_string()],
         metadata: Some("info".to_string()),
@@ -344,7 +344,7 @@ fn test_complex_struct() {
 fn test_complex_struct_minimal() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = Complex {
+    let s = Complex {
         id: 0,
         tags: vec![],
         metadata: None,
@@ -408,11 +408,11 @@ struct RenameTest {
 fn test_rename_attribute_encode() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = RenameTest {
+    let s = RenameTest {
         id: 1,
         name: "test".to_string(),
     };
-    let mut json = encode(&s).unwrap();
+    let json = encode(&s).unwrap();
     let json_str = String::from_utf8(json.clone()).unwrap();
     assert!(json_str.contains("\"user_id\":"));
     assert!(json_str.contains("\"full_name\":"));
@@ -424,7 +424,7 @@ fn test_rename_attribute_encode() {
 fn test_rename_attribute_roundtrip() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = RenameTest {
+    let s = RenameTest {
         id: 42,
         name: "Alice".to_string(),
     };
@@ -446,11 +446,11 @@ struct SkipTest {
 fn test_skip_attribute_not_in_output() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = SkipTest {
+    let s = SkipTest {
         visible: "shown".to_string(),
         hidden: "secret".to_string(),
     };
-    let mut json = encode(&s).unwrap();
+    let json = encode(&s).unwrap();
     let json_str = String::from_utf8(json).unwrap();
     assert!(json_str.contains("\"visible\":"));
     assert!(!json_str.contains("\"hidden\":"));
@@ -461,7 +461,7 @@ fn test_skip_attribute_not_in_output() {
 fn test_skip_attribute_default_on_decode() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = SkipTest {
+    let s = SkipTest {
         visible: "hello".to_string(),
         hidden: "should_be_lost".to_string(),
     };

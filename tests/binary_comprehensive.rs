@@ -6,16 +6,16 @@ use fastserial::{Decode, Encode, Error};
 #[test]
 fn test_binary_header_magic() {
     let _arena = fastserial::arena::Arena::new();
-    let mut data = 42u64;
-    let mut encoded = encode(&data).unwrap();
+    let data = 42u64;
+    let encoded = encode(&data).unwrap();
     assert_eq!(&encoded[0..4], b"FBIN");
 }
 
 #[test]
 fn test_binary_header_version() {
     let _arena = fastserial::arena::Arena::new();
-    let mut data = 42u64;
-    let mut encoded = encode(&data).unwrap();
+    let data = 42u64;
+    let encoded = encode(&data).unwrap();
     let version = u16::from_le_bytes([encoded[4], encoded[5]]);
     assert_eq!(version, 0x0001);
 }
@@ -23,8 +23,8 @@ fn test_binary_header_version() {
 #[test]
 fn test_binary_header_minimum_size() {
     let _arena = fastserial::arena::Arena::new();
-    let mut data = 0u64;
-    let mut encoded = encode(&data).unwrap();
+    let data = 0u64;
+    let encoded = encode(&data).unwrap();
     assert!(
         encoded.len() >= 16,
         "Binary format must have at least 16-byte header"
@@ -50,7 +50,7 @@ fn test_binary_too_short_input() {
 #[test]
 fn test_binary_empty_input() {
     let _arena = fastserial::arena::Arena::new();
-    let data: &[u8] = b"";
+    let mut data = b"".to_vec();
     let result: Result<u64, Error> = decode(&mut data, &_arena);
     assert!(result.is_err());
 }

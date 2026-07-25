@@ -20,7 +20,9 @@ fn main() {
     println!("Binary size: {} bytes", bytes.len());
     println!("Hex: {:02x?}", &bytes);
 
-    let decoded: Config = binary::decode(&bytes).expect("Failed to decode");
+    let mut bytes_vec = bytes.to_vec();
+    let _arena = fastserial::arena::Arena::new();
+    let decoded: Config = binary::decode(&mut bytes_vec, &_arena).expect("Failed to decode");
     println!("Decoded: {:?}", decoded);
     assert_eq!(decoded.name, config.name);
     assert_eq!(decoded.version, config.version);

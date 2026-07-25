@@ -67,10 +67,7 @@ fn unsigned_overflow_errors_25_digits() {
     // 25-digit number > u64::MAX ≈ 1.8e19
     let mut input = b"1234567890123456789012345".to_vec();
     let result: Result<u64, Error> = decode(&mut input, &_arena);
-    assert!(matches!(
-        result,
-        Err(Error::NumberOverflow { type_name: "u64" })
-    ));
+    assert!(matches!(result, Err(Error::NumberOverflow)));
 }
 
 #[test]
@@ -79,10 +76,7 @@ fn unsigned_overflow_errors_just_above_max() {
     // u64::MAX = 18446744073709551615; one more than that overflows.
     let mut input = b"18446744073709551616".to_vec();
     let result: Result<u64, Error> = decode(&mut input, &_arena);
-    assert!(matches!(
-        result,
-        Err(Error::NumberOverflow { type_name: "u64" })
-    ));
+    assert!(matches!(result, Err(Error::NumberOverflow)));
 }
 
 #[test]

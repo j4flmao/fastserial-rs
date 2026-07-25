@@ -96,7 +96,13 @@ fn main() {
 
     let start = Instant::now();
     for _ in 0..iterations {
-        std::hint::black_box(json::decode::<User>(&fastserial_encoded).unwrap());
+        std::hint::black_box(
+            json::decode::<User>(
+                &mut fastserial_encoded.to_vec(),
+                &fastserial::arena::Arena::new(),
+            )
+            .unwrap(),
+        );
     }
     let fastserial_decode = start.elapsed();
 
@@ -190,7 +196,13 @@ fn main() {
 
     let start = Instant::now();
     for _ in 0..large_iterations {
-        std::hint::black_box(json::decode::<Vec<User>>(&fastserial_large_encoded).unwrap());
+        std::hint::black_box(
+            json::decode::<Vec<User>>(
+                &mut fastserial_large_encoded.to_vec(),
+                &fastserial::arena::Arena::new(),
+            )
+            .unwrap(),
+        );
     }
     let fastserial_large_decode = start.elapsed();
 

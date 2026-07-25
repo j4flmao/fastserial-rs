@@ -221,7 +221,7 @@ pub trait Format {
                 r.expect_bytes(b"false")?;
                 Ok(false)
             }
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 
@@ -450,27 +450,49 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
     let mut n: u64 = 0;
     let mut pos = start;
 
-    // Fast path: most numbers are small
+    const POW10: [u64; 9] = [
+        1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+    ];
+
+    // SWAR 8-digits per cycle
+    while pos + 8 <= data.len() {
+        let chunk_slice: &[u8; 8] = data[pos..pos + 8].try_into().unwrap();
+        let chunk = u64::from_le_bytes(*chunk_slice);
+        let (val, digits) = parse_8_digits_swar(chunk);
+
+        if digits > 0 {
+            if let Some(next_n) = n
+                .checked_mul(POW10[digits as usize])
+                .and_then(|v| v.checked_add(val))
+            {
+                n = next_n;
+            } else {
+                return Err(Error::NumberOverflow);
+            }
+            pos += digits as usize;
+        }
+
+        if digits < 8 {
+            break;
+        }
+    }
+
+    // Scalar tail
     while pos < data.len() {
-        let b = data[pos];
+        let b = unsafe { *data.get_unchecked(pos) };
         if !b.is_ascii_digit() {
             break;
         }
         let digit = (b - b'0') as u64;
 
-        // Fast unchecked path (up to 19 digits fit in u64 safely)
-        if pos - start < 19 {
-            n = n * 10 + digit;
+        if let Some(next_n) = n.checked_mul(10).and_then(|v| v.checked_add(digit)) {
+            n = next_n;
         } else {
-            // Check overflow
-            if let Some(next_n) = n.checked_mul(10).and_then(|v| v.checked_add(digit)) {
-                n = next_n;
-            } else {
-                return Err(Error::NumberOverflow);
-            }
+            return Err(Error::NumberOverflow);
         }
         pos += 1;
     }
+
     r.pos = pos;
 
     if pos == start {
@@ -574,7 +596,7 @@ pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
 #[inline(always)]
 pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
     r.expect_byte(b'"')?;
-    let start = r.pos;
+    let _start = r.pos;
     let remaining = r.remaining_slice();
     let end = simd::scan_quote_or_backslash(remaining);
     let abs = r.pos + end;
@@ -595,7 +617,7 @@ pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
             Ok(slice)
         }
         b'\\' => Err(Error::EscapeInBorrowedString),
-        other => Err(Error::UnexpectedByte),
+        _other => Err(Error::UnexpectedByte),
     }
 }
 
@@ -877,7 +899,7 @@ pub fn skip_value(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
         b'"' => skip_string(r),
         b'[' => skip_container(r, b'[', b']'),
         b'{' => skip_container(r, b'{', b'}'),
-        b => Err(Error::UnexpectedByte),
+        _b => Err(Error::UnexpectedByte),
     }
 }
 
@@ -1207,7 +1229,7 @@ pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
             r.expect_bytes(b"false")?;
             Ok(false)
         }
-        b => Err(Error::UnexpectedByte),
+        _b => Err(Error::UnexpectedByte),
     }
 }
 

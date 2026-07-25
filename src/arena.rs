@@ -207,13 +207,13 @@ mod tests {
 
     #[test]
     fn alloc_returns_correct_value() {
-        let mut a = Arena::new();
+        let a = Arena::new();
         assert_eq!(*a.alloc(42u32), 42);
     }
 
     #[test]
     fn alloc_slice_copies() {
-        let mut a = Arena::new();
+        let a = Arena::new();
         let s = a.alloc_slice(&[1u32, 2, 3, 4, 5]);
         assert_eq!(s, &[1, 2, 3, 4, 5]);
     }
@@ -226,7 +226,7 @@ mod tests {
         // list, so each chunk's bytes live until reset. We collect the
         // pointer of the first allocation, force many more allocations that
         // grow into new chunks, then re-borrow the original pointer.
-        let mut a = Arena::with_capacity(64);
+        let a = Arena::with_capacity(64);
         let first_ptr: *const u64 = a.alloc(0xdeadbeefu64);
         for i in 0..1000u64 {
             let _ = a.alloc(i);
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn alloc_respects_alignment() {
-        let mut a = Arena::with_capacity(64);
+        let a = Arena::with_capacity(64);
         // Force unaligned cursor by alloc-ing one byte first.
         let _ = a.alloc(1u8);
         let p: *const u64 = a.alloc(0u64);
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn larger_than_chunk_still_allocates() {
-        let mut a = Arena::with_capacity(64);
+        let a = Arena::with_capacity(64);
         let big: [u32; 1024] = core::array::from_fn(|i| i as u32);
         let s = a.alloc_slice(&big);
         assert_eq!(s.len(), 1024);

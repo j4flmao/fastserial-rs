@@ -28,15 +28,9 @@ fn test_simd_string_boundary_32() {
     let _arena = fastserial::arena::Arena::new();
     // String content of exactly 32 bytes (excluding quotes)
     let content = "a".repeat(32);
-    let mut input = format!("\"{}\"", content);
-    let decoded: &str = decode(
-        &mut {
-            let mut v = input.into_bytes();
-            v
-        },
-        &_arena,
-    )
-    .unwrap();
+    let input = format!("\"{}\"", content);
+    let mut input_vec = input.into_bytes();
+    let decoded: &str = decode(&mut input_vec, &_arena).unwrap();
     assert_eq!(decoded, content);
 }
 
@@ -46,34 +40,21 @@ fn test_simd_string_boundary_31() {
     let _arena = fastserial::arena::Arena::new();
     // String content of exactly 31 bytes (excluding quotes)
     let content = "b".repeat(31);
-    let mut input = format!("\"{}\"", content);
-    let decoded: &str = decode(
-        &mut {
-            let mut v = input.into_bytes();
-            v
-        },
-        &_arena,
-    )
-    .unwrap();
+    let input = format!("\"{}\"", content);
+    let mut input_vec = input.into_bytes();
+    let decoded: &str = decode(&mut input_vec, &_arena).unwrap();
     assert_eq!(decoded, content);
 }
 
 #[test]
 fn test_simd_string_with_escapes_near_boundary() {
     let _arena = fastserial::arena::Arena::new();
-    let _arena = fastserial::arena::Arena::new();
     // Escape character near 32-byte boundary
     let mut content = "a".repeat(30);
     content.push_str("\\n"); // This makes it 32 characters in JSON
-    let mut input = format!("\"{}\"", content);
-    let decoded: String = decode(
-        &mut {
-            let mut v = input.into_bytes();
-            v
-        },
-        &_arena,
-    )
-    .unwrap();
+    let input = format!("\"{}\"", content);
+    let mut input_vec = input.into_bytes();
+    let decoded: String = decode(&mut input_vec, &_arena).unwrap();
     assert_eq!(decoded, "a".repeat(30) + "\n");
 }
 

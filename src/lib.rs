@@ -55,7 +55,7 @@
 //! let json_data = json::encode(&user)?;
 //!
 //! // Deserialize back to struct
-//! let decoded: User = json::decode(&json_data)?;
+//! let mut json_data = json_data; let _arena = fastserial::arena::Arena::new(); let decoded: User = json::decode(&mut json_data, &_arena)?;
 //!
 //! assert_eq!(user, decoded);
 //! # Ok(())
@@ -97,7 +97,7 @@
 //! # fn main() -> Result<(), fastserial::Error> {
 //! let p = Point { x: 10, y: 20 };
 //! let encoded = json::encode(&p)?;
-//! let decoded: Point = json::decode(&encoded)?;
+//! let mut encoded = encoded; let _arena = fastserial::arena::Arena::new(); let decoded: Point = json::decode(&mut encoded, &_arena)?;
 //! assert_eq!(p.x, decoded.x);
 //! # Ok(())
 //! # }
@@ -383,7 +383,7 @@ pub mod json {
     /// ```rust
     /// use fastserial::json;
     ///
-    /// let num: i32 = json::decode(b"42").unwrap();
+    /// let _arena = fastserial::arena::Arena::new(); let num: i32 = json::decode(&mut b"42".to_vec(), &_arena).unwrap();
     /// assert_eq!(num, 42);
     /// ```
     ///
@@ -397,7 +397,7 @@ pub mod json {
     /// }
     ///
     /// let input = r#"{"text":"Hello"}"#;
-    /// let msg: Message = json::decode(&mut input.as_bytes().to_vec()).unwrap();
+    /// let mut bytes = input.as_bytes().to_vec(); let _arena = fastserial::arena::Arena::new(); let msg: Message = json::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(msg.text, "Hello");
     /// ```
     ///
@@ -413,20 +413,15 @@ pub mod json {
         input: &'de mut [u8],
         arena: &'de crate::arena::Arena,
     ) -> Result<T, Error> {
-        let padded = if input.len() >= 64 && input[input.len() - 64..].iter().all(|&b| b == 0) {
-            input
-        } else {
-            let len = input.len();
-            let new_slice = arena.alloc_bytes(len + 64);
-            unsafe {
-                core::ptr::copy_nonoverlapping(input.as_ptr(), new_slice.as_mut_ptr(), len);
-                core::ptr::write_bytes(new_slice.as_mut_ptr().add(len), 0, 64);
-            }
-            new_slice
-        };
-        let mut r = io::ReadBuffer::new(padded);
+        let len = input.len();
+        let mut r = io::ReadBuffer::new(input);
         let val = T::decode(&mut r, arena)?;
         codec::json::skip_whitespace(&mut r);
+
+        if r.pos < len {
+            return Err(Error::TrailingData);
+        }
+
         Ok(val)
     }
 
@@ -440,7 +435,7 @@ pub mod json {
     /// ```rust
     /// use fastserial::json;
     ///
-    /// let num: i32 = json::decode_str("42").unwrap();
+    /// let mut s = String::from("42"); let _arena = fastserial::arena::Arena::new(); let num: i32 = json::decode_str(&mut s, &_arena).unwrap();
     /// assert_eq!(num, 42);
     /// ```
     pub fn decode_str<'de, T: Decode<'de>>(
@@ -640,7 +635,7 @@ pub mod binary {
     /// let user = User { id: 1, name: "Alice".into() };
     /// let bytes = binary::encode(&user).unwrap();
     /// assert!(bytes.starts_with(b"FBIN"));
-    /// let decoded: User = binary::decode(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: User = binary::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(user, decoded);
     /// ```
     ///
@@ -705,7 +700,7 @@ pub mod binary {
     ///
     /// let original = Data { id: 100 };
     /// let bytes = binary::encode(&original).unwrap();
-    /// let decoded: Data = binary::decode(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: Data = binary::decode(&mut bytes, &_arena).unwrap();
     /// assert_eq!(original, decoded);
     /// ```
     ///
@@ -790,7 +785,7 @@ pub mod binary {
     ///
     /// let original = Data { id: 100 };
     /// let bytes = binary::encode_raw(&original).unwrap();
-    /// let decoded: Data = binary::decode_raw(&bytes).unwrap();
+    /// let mut bytes = bytes; let _arena = fastserial::arena::Arena::new(); let decoded: Data = binary::decode_raw(&mut bytes, &_arena).unwrap();
     /// assert_eq!(original, decoded);
     /// ```
     ///
@@ -1002,7 +997,10 @@ impl Encode for alloc::string::String {
 
 impl<'de> Decode<'de> for alloc::string::String {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>, arena: &'de crate::arena::Arena) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_string_owned(r)
     }
 }
@@ -1023,7 +1021,10 @@ impl Encode for &str {
 
 impl<'de> Decode<'de> for &'de str {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>, arena: &'de crate::arena::Arena) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_string(r)
     }
 }
@@ -1044,7 +1045,10 @@ impl Encode for &[u8] {
 
 impl<'de> Decode<'de> for &'de [u8] {
     #[inline]
-    fn decode(r: &mut io::ReadBuffer<'de>, arena: &'de crate::arena::Arena) -> Result<Self, Error> {
+    fn decode(
+        r: &mut io::ReadBuffer<'de>,
+        _arena: &'de crate::arena::Arena,
+    ) -> Result<Self, Error> {
         codec::json::read_bytes(r)
     }
 }

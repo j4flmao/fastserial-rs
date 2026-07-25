@@ -253,7 +253,7 @@ impl<'de> Decode<'de> for Value {
                     Ok(Value::Number(Number::U64(n)))
                 }
             }
-            b => Err(Error::UnexpectedByte),
+            _b => Err(Error::UnexpectedByte),
         }
     }
 }

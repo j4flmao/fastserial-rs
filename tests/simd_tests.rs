@@ -13,7 +13,7 @@ fn test_scan_empty_input() {
 fn test_scan_no_special_chars() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = b"abcdefghijklmnop".to_vec();
+    let input = b"abcdefghijklmnop".to_vec();
     assert_eq!(simd::scan_quote_or_backslash(&input), input.len());
 }
 
@@ -77,7 +77,7 @@ fn test_scan_only_backslash() {
 fn test_scan_large_no_match() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = vec![b'a'; 256];
+    let input = vec![b'a'; 256];
     assert_eq!(simd::scan_quote_or_backslash(&input), 256);
 }
 
@@ -190,8 +190,8 @@ fn test_skip_whitespace_mixed() {
 fn test_skip_whitespace_all_whitespace() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = b"     ".to_vec();
-    assert_eq!(simd::skip_whitespace(input), input.len());
+    let input = b"     ".to_vec();
+    assert_eq!(simd::skip_whitespace(&input), input.len());
 }
 
 #[test]
@@ -274,7 +274,7 @@ fn test_is_all_ascii_mixed() {
 fn test_is_all_ascii_large_ascii() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = vec![b'a'; 1000];
+    let input = vec![b'a'; 1000];
     assert!(simd::is_all_ascii(&input));
 }
 
@@ -291,7 +291,7 @@ fn test_is_all_ascii_large_with_non_ascii_at_end() {
 fn test_is_all_ascii_boundary_31() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = vec![b'x'; 31];
+    let input = vec![b'x'; 31];
     assert!(simd::is_all_ascii(&input));
 }
 
@@ -299,7 +299,7 @@ fn test_is_all_ascii_boundary_31() {
 fn test_is_all_ascii_boundary_32() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = vec![b'x'; 32];
+    let input = vec![b'x'; 32];
     assert!(simd::is_all_ascii(&input));
 }
 
@@ -307,6 +307,6 @@ fn test_is_all_ascii_boundary_32() {
 fn test_is_all_ascii_boundary_33() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut input = vec![b'x'; 33];
+    let input = vec![b'x'; 33];
     assert!(simd::is_all_ascii(&input));
 }

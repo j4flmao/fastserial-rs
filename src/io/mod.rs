@@ -152,6 +152,24 @@ impl<'de> ReadBuffer<'de> {
         self.data.get(self.pos).copied().unwrap_or(0)
     }
 
+    /// Peeks at the next byte without bounds check.
+    /// # Safety
+    /// Caller must ensure `pos < data.len()`.
+    #[inline(always)]
+    pub unsafe fn peek_unchecked(&self) -> u8 {
+        unsafe { *self.data.get_unchecked(self.pos) }
+    }
+
+    /// Reads the next byte without bounds check and advances.
+    /// # Safety
+    /// Caller must ensure `pos < data.len()`.
+    #[inline(always)]
+    pub unsafe fn next_byte_unchecked(&mut self) -> u8 {
+        let b = unsafe { *self.data.get_unchecked(self.pos) };
+        self.pos += 1;
+        b
+    }
+
     /// Peeks at offset without advancing.
     #[inline]
     pub fn peek_at(&self, offset: usize) -> u8 {
@@ -184,7 +202,7 @@ impl<'de> ReadBuffer<'de> {
 
     /// Advances the reading position by `n` bytes.
     #[inline]
-    #[inline]
+
     pub fn as_str(&self, bytes: &'de [u8]) -> Result<&'de str, Error> {
         if self.is_utf8_validated {
             Ok(unsafe { core::str::from_utf8_unchecked(bytes) })

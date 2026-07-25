@@ -225,8 +225,7 @@ fn test_vec_of_strings_escaped() {
 #[test]
 fn test_string_long() {
     let _arena = fastserial::arena::Arena::new();
-    let mut s =
-        String::from("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ").repeat(100);
+    let s = String::from("Lorem ipsum dolor sit amet, consectetur adipiscing elit. ").repeat(100);
     let mut json = encode(&s).unwrap();
     let decoded: &str = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);

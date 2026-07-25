@@ -115,7 +115,7 @@ fn test_slice_write_exact_capacity() {
 fn test_readbuffer_new() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let buf = ReadBuffer::new(&data);
     assert_eq!(buf.get_pos(), 0);
     assert!(!buf.is_eof());
@@ -125,7 +125,7 @@ fn test_readbuffer_new() {
 fn test_readbuffer_empty() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"".to_vec();
+    let data = b"".to_vec();
     let buf = ReadBuffer::new(&data);
     assert!(buf.is_eof());
     assert_eq!(buf.remaining(), 0);
@@ -135,7 +135,7 @@ fn test_readbuffer_empty() {
 fn test_readbuffer_peek() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"abc".to_vec();
+    let data = b"abc".to_vec();
     let buf = ReadBuffer::new(&data);
     assert_eq!(buf.peek(), b'a');
     // peek should not advance
@@ -146,7 +146,7 @@ fn test_readbuffer_peek() {
 fn test_readbuffer_peek_eof() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"".to_vec();
+    let data = b"".to_vec();
     let buf = ReadBuffer::new(&data);
     assert_eq!(buf.peek(), 0);
 }
@@ -155,7 +155,7 @@ fn test_readbuffer_peek_eof() {
 fn test_readbuffer_next_byte() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"abc".to_vec();
+    let data = b"abc".to_vec();
     let mut buf = ReadBuffer::new(&data);
     assert_eq!(buf.next_byte().unwrap(), b'a');
     assert_eq!(buf.next_byte().unwrap(), b'b');
@@ -167,7 +167,7 @@ fn test_readbuffer_next_byte() {
 fn test_readbuffer_next_byte_eof() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"".to_vec();
+    let data = b"".to_vec();
     let mut buf = ReadBuffer::new(&data);
     let result = buf.next_byte();
     assert!(result.is_err());
@@ -177,7 +177,7 @@ fn test_readbuffer_next_byte_eof() {
 fn test_readbuffer_advance() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello world".to_vec();
+    let data = b"hello world".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.advance(5);
     assert_eq!(buf.get_pos(), 5);
@@ -188,7 +188,7 @@ fn test_readbuffer_advance() {
 fn test_readbuffer_expect_byte_success() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b'h').unwrap();
     assert_eq!(buf.get_pos(), 1);
@@ -198,7 +198,7 @@ fn test_readbuffer_expect_byte_success() {
 fn test_readbuffer_expect_byte_failure() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let mut buf = ReadBuffer::new(&data);
     let result = buf.expect_byte(b'x');
     assert!(result.is_err());
@@ -208,7 +208,7 @@ fn test_readbuffer_expect_byte_failure() {
 fn test_readbuffer_expect_bytes_success() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello world".to_vec();
+    let data = b"hello world".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_bytes(b"hello").unwrap();
     assert_eq!(buf.get_pos(), 5);
@@ -218,7 +218,7 @@ fn test_readbuffer_expect_bytes_success() {
 fn test_readbuffer_expect_bytes_failure() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let mut buf = ReadBuffer::new(&data);
     let result = buf.expect_bytes(b"world");
     assert!(result.is_err());
@@ -228,7 +228,7 @@ fn test_readbuffer_expect_bytes_failure() {
 fn test_readbuffer_expect_at_success() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let buf = ReadBuffer::new(&data);
     buf.expect_at(0, b'h').unwrap();
     buf.expect_at(4, b'o').unwrap();
@@ -238,7 +238,7 @@ fn test_readbuffer_expect_at_success() {
 fn test_readbuffer_expect_at_failure() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let buf = ReadBuffer::new(&data);
     let result = buf.expect_at(0, b'x');
     assert!(result.is_err());
@@ -248,7 +248,7 @@ fn test_readbuffer_expect_at_failure() {
 fn test_readbuffer_expect_at_out_of_bounds() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hi".to_vec();
+    let data = b"hi".to_vec();
     let buf = ReadBuffer::new(&data);
     let result = buf.expect_at(10, b'x');
     assert!(result.is_err());
@@ -258,7 +258,7 @@ fn test_readbuffer_expect_at_out_of_bounds() {
 fn test_readbuffer_remaining() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let mut buf = ReadBuffer::new(&data);
     assert_eq!(buf.remaining(), 5);
     buf.advance(3);
@@ -271,7 +271,7 @@ fn test_readbuffer_remaining() {
 fn test_readbuffer_slice_from() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello world".to_vec();
+    let data = b"hello world".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.advance(5);
     let slice = buf.slice_from(0);
@@ -282,7 +282,7 @@ fn test_readbuffer_slice_from() {
 fn test_readbuffer_peek_slice() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello world".to_vec();
+    let data = b"hello world".to_vec();
     let buf = ReadBuffer::new(&data);
     let peeked = buf.peek_slice(5);
     assert_eq!(peeked, b"hello");
@@ -293,7 +293,7 @@ fn test_readbuffer_peek_slice() {
 fn test_readbuffer_peek_slice_beyond_end() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hi".to_vec();
+    let data = b"hi".to_vec();
     let buf = ReadBuffer::new(&data);
     let peeked = buf.peek_slice(100);
     assert_eq!(peeked, b"hi"); // clamped to available
@@ -303,7 +303,7 @@ fn test_readbuffer_peek_slice_beyond_end() {
 fn test_readbuffer_skip() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hello".to_vec();
+    let data = b"hello".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.skip(3);
     assert_eq!(buf.get_pos(), 3);
@@ -314,7 +314,7 @@ fn test_readbuffer_skip() {
 fn test_readbuffer_skip_beyond_end() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"hi".to_vec();
+    let data = b"hi".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.skip(100);
     assert!(buf.is_eof());
@@ -324,7 +324,7 @@ fn test_readbuffer_skip_beyond_end() {
 fn test_readbuffer_is_eof_after_read_all() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"ab".to_vec();
+    let data = b"ab".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.next_byte().unwrap();
     assert!(!buf.is_eof());
@@ -338,7 +338,7 @@ fn test_readbuffer_is_eof_after_read_all() {
 fn test_readbuffer_expect_open_brace() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"{".to_vec();
+    let data = b"{".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b'{').unwrap();
 }
@@ -347,7 +347,7 @@ fn test_readbuffer_expect_open_brace() {
 fn test_readbuffer_expect_close_brace() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"}".to_vec();
+    let data = b"}".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b'}').unwrap();
 }
@@ -356,7 +356,7 @@ fn test_readbuffer_expect_close_brace() {
 fn test_readbuffer_expect_open_bracket() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"[".to_vec();
+    let data = b"[".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b'[').unwrap();
 }
@@ -365,7 +365,7 @@ fn test_readbuffer_expect_open_bracket() {
 fn test_readbuffer_expect_close_bracket() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"]".to_vec();
+    let data = b"]".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b']').unwrap();
 }
@@ -374,7 +374,7 @@ fn test_readbuffer_expect_close_bracket() {
 fn test_readbuffer_expect_colon() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b":".to_vec();
+    let data = b":".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b':').unwrap();
 }
@@ -383,7 +383,7 @@ fn test_readbuffer_expect_colon() {
 fn test_readbuffer_expect_comma() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b",".to_vec();
+    let data = b",".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b',').unwrap();
 }
@@ -392,7 +392,7 @@ fn test_readbuffer_expect_comma() {
 fn test_readbuffer_expect_quote() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut data = b"\"".to_vec();
+    let data = b"\"".to_vec();
     let mut buf = ReadBuffer::new(&data);
     buf.expect_byte(b'"').unwrap();
 }

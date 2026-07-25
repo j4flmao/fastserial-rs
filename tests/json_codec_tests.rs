@@ -266,7 +266,7 @@ fn test_string_with_all_escape_chars() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = "quote:\" backslash:\\ newline:\n tab:\t cr:\r";
+    let s = "quote:\" backslash:\\ newline:\n tab:\t cr:\r";
     let mut json = encode(&s).unwrap();
     let decoded: String = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
@@ -277,7 +277,7 @@ fn test_string_with_control_char_0x01() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = "ctrl-a:\x01";
+    let s = "ctrl-a:\x01";
     let mut json = encode(&s).unwrap();
     let decoded: String = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
@@ -288,7 +288,7 @@ fn test_string_with_multiple_control_chars() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = "\x01\x02\x03\x04\x05\x06\x07\x08\x09";
+    let s = "\x01\x02\x03\x04\x05\x06\x07\x08\x09";
     let mut json = encode(&s).unwrap();
     let decoded: String = decode(&mut json, &_arena).unwrap();
     assert_eq!(s, decoded);
@@ -380,7 +380,7 @@ fn test_simple_struct_roundtrip() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = SimpleStruct {
+    let s = SimpleStruct {
         id: 1,
         name: "test".to_string(),
     };
@@ -394,11 +394,11 @@ fn test_simple_struct_json_format() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = SimpleStruct {
+    let s = SimpleStruct {
         id: 42,
         name: "hello".to_string(),
     };
-    let mut json = encode(&s).unwrap();
+    let json = encode(&s).unwrap();
     let json_str = String::from_utf8(json).unwrap();
     assert!(json_str.contains("\"id\":42"));
     assert!(json_str.contains("\"name\":\"hello\""));
@@ -425,7 +425,7 @@ fn test_all_primitives_struct_roundtrip() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = AllPrimitivesStruct {
+    let s = AllPrimitivesStruct {
         a_u8: 255,
         a_u16: 65535,
         a_u32: 4294967295,
@@ -467,7 +467,7 @@ fn test_struct_with_vec_roundtrip() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithVec {
+    let s = StructWithVec {
         items: vec![1, 2, 3, 4, 5],
         labels: vec!["a".to_string(), "b".to_string(), "c".to_string()],
     };
@@ -481,7 +481,7 @@ fn test_struct_with_empty_vecs() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithVec {
+    let s = StructWithVec {
         items: vec![],
         labels: vec![],
     };
@@ -502,7 +502,7 @@ fn test_struct_with_all_some_options() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithOptions {
+    let s = StructWithOptions {
         required: 42,
         optional_num: Some(100),
         optional_str: Some("present".to_string()),
@@ -517,7 +517,7 @@ fn test_struct_with_all_none_options() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithOptions {
+    let s = StructWithOptions {
         required: 0,
         optional_num: None,
         optional_str: None,
@@ -532,7 +532,7 @@ fn test_struct_with_mixed_options() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithOptions {
+    let s = StructWithOptions {
         required: 7,
         optional_num: Some(-5),
         optional_str: None,
@@ -552,7 +552,7 @@ fn test_struct_with_nested_vec() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
-    let mut s = StructWithNestedVec {
+    let s = StructWithNestedVec {
         matrix: vec![vec![1, 2, 3], vec![4, 5, 6]],
     };
     let mut json = encode(&s).unwrap();
@@ -649,7 +649,7 @@ fn test_encode_bytes_simple() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let bytes: &[u8] = b"hello";
-    let mut json = encode(&bytes).unwrap();
+    let json = encode(&bytes).unwrap();
     assert_eq!(json, br#""hello""#);
 }
 
@@ -659,7 +659,7 @@ fn test_encode_bytes_empty() {
     let _arena = fastserial::arena::Arena::new();
     let _arena = fastserial::arena::Arena::new();
     let bytes: &[u8] = b"";
-    let mut json = encode(&bytes).unwrap();
+    let json = encode(&bytes).unwrap();
     assert_eq!(json, br#""""#);
 }
 
@@ -682,7 +682,7 @@ fn test_bytes_with_special_chars_encodes_escaped() {
     // Bytes with special chars get escaped in encoding, but read_bytes
     // only supports unescaped strings (zero-copy), so we just verify encoding works
     let bytes: &[u8] = b"hello\"world";
-    let mut json = encode(&bytes).unwrap();
+    let json = encode(&bytes).unwrap();
     let json_str = String::from_utf8(json).unwrap();
     assert!(json_str.contains("\\\""));
 }
