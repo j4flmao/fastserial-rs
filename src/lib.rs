@@ -442,7 +442,16 @@ pub mod json {
         input: &'de mut str,
         arena: &'de crate::arena::Arena,
     ) -> Result<T, Error> {
-        decode(unsafe { input.as_bytes_mut() }, arena)
+        let len = input.len();
+        let mut r = io::ReadBuffer::new_validated(unsafe { input.as_bytes_mut() });
+        let val = T::decode(&mut r, arena)?;
+        codec::json::skip_whitespace(&mut r);
+
+        if r.pos < len {
+            return Err(Error::TrailingData);
+        }
+
+        Ok(val)
     }
 
     /// Encodes a value to pretty-printed JSON with indentation.
