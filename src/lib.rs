@@ -1081,7 +1081,7 @@ mod chrono_impl {
         #[inline]
         fn decode(
             r: &mut io::ReadBuffer<'de>,
-            arena: &'de crate::arena::Arena,
+            _arena: &'de crate::arena::Arena,
         ) -> Result<Self, Error> {
             let s = codec::json::read_string(r)?;
             DateTime::parse_from_rfc3339(s)
