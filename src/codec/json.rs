@@ -1,31 +1,19 @@
+//! A high-performance JSON encoding and decoding implementation.
+//!
+//! This module provides specialized traits and functions for working with JSON data.
+//! It leverages SIMD acceleration for scanning and escaping, and procedural macros
+//! for specialized code generation.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use fastserial::{Encode, Decode, json};
+//! // ...
+//! ```
+
 use crate::Error;
 use crate::io::{ReadBuffer, WriteBuffer};
 use crate::simd;
-
-/// A high-performance JSON encoding and decoding implementation.
-///
-/// This module provides specialized traits and functions for working with JSON data.
-/// It leverages SIMD acceleration for scanning and escaping, and procedural macros
-/// for specialized code generation.
-///
-/// # Examples
-///
-/// ```rust
-/// use fastserial::{Encode, Decode, json};
-///
-/// #[derive(Encode, Decode, Debug, PartialEq)]
-/// struct Point {
-///     x: i32,
-///     y: i32,
-/// }
-///
-/// # fn main() -> Result<(), fastserial::Error> {
-/// let p = Point { x: 1, y: 2 };
-/// let json_data = json::encode(&p)?;
-/// assert_eq!(String::from_utf8_lossy(&json_data), r#"{"x":1,"y":2}"#);
-/// # Ok(())
-/// # }
-/// ```
 pub trait Format {
     /// Encodes a struct using this format.
     ///

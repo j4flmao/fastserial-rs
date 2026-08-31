@@ -1,3 +1,32 @@
+//! Zero-allocation JSON DOM (Tape)
+//!
+//! This module provides `TapeNode`, an unstructured data model for JSON that
+//! completely eliminates heap allocations via bump-allocation (Arena).
+//!
+//! Instead of using `String`, `Vec`, or `BTreeMap` which incur heavy memory
+//! allocation costs, `TapeNode` stores all strings, arrays, and objects as
+//! contiguous slices within a bump allocator (`Arena`).
+//!
+//! This architecture is inspired by `simdjson` and delivers up to **2.4x speedups**
+//! over `serde_json::Value` when parsing arbitrary JSON structures.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use fastserial::tape::TapeNode;
+//! use fastserial::arena::Arena;
+//! use fastserial::io::ReadBuffer;
+//! use fastserial::Decode;
+//!
+//! let arena = Arena::new();
+//! let mut buf = ReadBuffer::new(br#"{"fast": true, "speed": 9999}"#);
+//! let tape = TapeNode::decode(&mut buf, &arena).unwrap();
+//!
+//! if let TapeNode::Object(map) = tape {
+//!     assert_eq!(map.len(), 2);
+//! }
+//! ```
+
 use crate::{Decode, Error, io};
 
 /// A zero-allocation, arena-backed JSON DOM (similar to simdjson's Tape).

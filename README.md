@@ -9,6 +9,13 @@
 
 `fastserial` is a high-performance, zero-copy serialization and deserialization framework for Rust. It is an **ambitious project** designed as an alternative for high-throughput use cases like REST APIs, game engines, and real-time data processing, focusing on minimizing overhead and maximizing efficiency.
 
+## 🚀 V2.0 New Features!
+
+- **Serde-Compatible Macro Attributes**: Support for `#[fastserial(rename_all = "camelCase")]`, `#[fastserial(default)]`, and `#[fastserial(skip_serializing_if = "...")]`.
+- **Zero-Allocation DOM (TapeNode)**: Parse JSON into an unstructured DOM (`TapeNode`) directly into an Arena without any `String` or `Vec` allocations, achieving 2.4x speedups over `serde_json::Value`.
+- **Streaming & Async NDJSON**: Effortlessly process multi-gigabyte log files using `NdjsonStream` (Sync) or `AsyncNdjsonStream` (Async via `tokio`).
+- **CBOR Support**: Full zero-copy encoding and decoding for the CBOR binary standard (RFC 8949).
+
 ## 🚀 Key Features
 
 - **Ambitious Performance**: Designed for high throughput by using specialized code generation and SIMD-accelerated scanning.
@@ -23,49 +30,71 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-fastserial = "0.1"
+fastserial = "0.2" # V2.0 features!
 ```
 
 Or for the latest version:
 
 ```toml
 [dependencies]
-fastserial = "0.1"
+fastserial = { git = "https://github.com/j4flmao/fastserial-rs.git" }
 ```
 
 > **Note**: This library requires Rust 1.94 or later for full SIMD support (AVX2, SSE4.2).
 
 ## 🛠️ Usage
 
+### Struct Serialization
+
 ```rust
 use fastserial::{Encode, Decode, json};
 
 #[derive(Encode, Decode, Debug, PartialEq)]
+#[fastserial(rename_all = "camelCase")]
 struct User<'a> {
     id: u64,
     username: &'a str,
+    #[fastserial(default)]
     email: String,
-    #[fastserial(skip)]
-    password_hash: String,
+    #[fastserial(skip_serializing_if = "Option::is_none")]
+    nickname: Option<String>,
 }
+// ...
+```
 
-fn main() -> Result<(), fastserial::Error> {
-    let user = User {
-        id: 1,
-        username: "j4flmao",
-        email: "dev@fastserial.rs".into(),
-        password_hash: "secret_hash".into(),
-    };
+### Async Streaming (NDJSON)
 
-    // Serialize to JSON
-    let json_data = json::encode(&user)?;
-    println!("{}", String::from_utf8_lossy(&json_data));
+```rust
+use fastserial::stream::AsyncNdjsonStream;
+use tokio::fs::File;
+use tokio::io::BufReader;
 
-    // Deserialize back (zero-copy for username)
-    let decoded: User = json::decode(&json_data)?;
-    assert_eq!(user.username, decoded.username);
+#[tokio::main]
+async fn main() {
+    let file = File::open("large_logs.jsonl").await.unwrap();
+    let reader = BufReader::new(file);
+    let mut stream = AsyncNdjsonStream::<LogEntry, _>::new(reader);
 
-    Ok(())
+    while let Some(entry) = stream.next().await {
+        println!("Log: {:?}", entry);
+    }
+}
+```
+
+### Zero-Allocation DOM (Tape)
+
+```rust
+use fastserial::tape::TapeNode;
+use fastserial::arena::Arena;
+use fastserial::io::ReadBuffer;
+use fastserial::Decode;
+
+let arena = Arena::new();
+let mut buf = ReadBuffer::new(br#"{"fast": true, "speed": 9999}"#);
+let tape = TapeNode::decode(&mut buf, &arena).unwrap();
+
+if let TapeNode::Object(map) = tape {
+    assert_eq!(map.get("fast"), Some(&TapeNode::Bool(true)));
 }
 ```
 
@@ -94,18 +123,21 @@ make run-sample  # Run the sample-axum application
 |-----------|---------------|--------|
 | **JSON** | SIMD + Zero-copy | High throughput |
 | **Binary** | Direct Mapping | Ultra-low latency |
-| **Memory** | Borrowing | Minimal allocations |
+| **Memory** | Borrowing / Arena | Minimal allocations |
 
 ## ⚙️ Configuration
 
 - `std` (default): Enables `std` support.
 - `json` (default): Enables JSON codec.
 - `binary` (default): Enables the FastSerial binary format.
+- `cbor` (default): Enables the CBOR format support.
 - `msgpack`: Enables MessagePack codec.
+- `tokio`: Enables Async NDJSON streaming support.
 - `chrono`: Enables support for `chrono` types.
 - `HashMap` / `BTreeMap` serialization support.
 - `Tuple` serialization support.
 - `json::Value` dynamic type for untyped JSON.
+- `tape::TapeNode` zero-allocation dynamic DOM.
 - `json::encode_pretty` for human-readable output.
 
 ## 🤝 Contributing

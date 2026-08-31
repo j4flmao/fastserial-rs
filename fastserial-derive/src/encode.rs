@@ -1,3 +1,36 @@
+//! Derive macro implementations for fastserial Encode trait.
+//!
+//! This module provides the procedural macro for automatically implementing
+//! the `Encode` trait for custom structs and enums. It generates optimized
+//! formatting code, writing string and byte buffers directly to avoid intermediate allocations.
+//!
+//! # Features
+//!
+//! - **Hardcoded JSON logic**: For maximum speed, field keys and delimiters (`{`, `"`, `:`)
+//!   are written directly as byte arrays.
+//! - **Serde-compatible Attributes**:
+//!   - `#[fastserial(rename_all = "camelCase")]`: Supports `camelCase`, `snake_case`, `PascalCase`, etc.
+//!   - `#[fastserial(rename = "...")]`: Custom name for a specific field.
+//!   - `#[fastserial(skip)]`: Ignore field during serialization.
+//!   - `#[fastserial(skip_serializing_if = "path")]`: Conditionally skip a field (e.g., `Option::is_none`).
+//!     Dynamically handles comma placement.
+//! - **Enum Tagging**: Supports Internal, External, Adjacent, and Untagged representations.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use fastserial::Encode;
+//!
+//! #[derive(Encode)]
+//! #[fastserial(rename_all = "camelCase")]
+//! struct Point {
+//!     x: i32,
+//!     y: i32,
+//!     #[fastserial(skip_serializing_if = "Option::is_none")]
+//!     name: Option<String>,
+//! }
+//! ```
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields};

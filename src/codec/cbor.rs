@@ -1,8 +1,27 @@
-//! # CBOR Format
+//! # CBOR Format (RFC 8949)
 //!
-//! This module provides CBOR (Concise Binary Object Representation) serialization format.
+//! This module provides high-performance encoding and decoding for CBOR
+//! (Concise Binary Object Representation), a standard binary data format.
 //!
-//! CBOR is a standard binary format defined in RFC 8949.
+//! CBOR is designed to be highly compact, making it ideal for network transmission
+//! and scenarios where payload size matters.
+//!
+//! # Features
+//!
+//! - **Full Standard Support**: Handles primitives, floats, bytes, strings, arrays, and maps.
+//! - **Zero-copy Integration**: Decodes byte slices dynamically with minimal allocation.
+//! - **Direct `Value` Conversion**: Parses directly into `fastserial::value::Value`.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use fastserial::codec::cbor;
+//! use fastserial::value::Value;
+//! 
+//! let my_obj = Value::Null; // Construct a Value tree
+//! let encoded_bytes = cbor::encode(&my_obj).unwrap();
+//! let decoded_val = cbor::decode(&encoded_bytes).unwrap();
+//! ```
 
 use crate::io::{ReadBuffer, WriteBuffer};
 use crate::{Decode, Encode, Error, Format};

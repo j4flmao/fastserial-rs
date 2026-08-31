@@ -1,3 +1,31 @@
+//! NDJSON Streaming Utilities
+//!
+//! This module provides streaming deserialization for Newline Delimited JSON (NDJSON).
+//! It is designed for processing extremely large datasets (multi-gigabyte log files,
+//! big data exports) without loading the entire payload into memory.
+//!
+//! # Features
+//!
+//! - **Sync Streaming**: `NdjsonStream` provides synchronous streaming using `std::io::BufRead`.
+//! - **Async Streaming**: `AsyncNdjsonStream` provides asynchronous streaming using `tokio::io::AsyncBufRead`
+//!   (requires the `tokio` feature).
+//! - **Zero-copy integration**: Reuses an internal `Vec<u8>` to buffer each line, and uses
+//!   the `Arena` and `Decode` traits to parse objects rapidly in place.
+//!
+//! # Example (Async)
+//!
+//! ```ignore
+//! use fastserial::stream::AsyncNdjsonStream;
+//! use tokio::io::BufReader;
+//!
+//! let reader = BufReader::new(file);
+//! let mut stream = AsyncNdjsonStream::<MyLogEntry, _>::new(reader);
+//!
+//! while let Some(entry) = stream.next().await {
+//!     println!("{:?}", entry);
+//! }
+//! ```
+
 #[cfg(feature = "std")]
 use std::io::BufRead;
 

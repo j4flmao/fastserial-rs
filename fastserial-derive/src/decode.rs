@@ -9,8 +9,13 @@
 //! - **SIMD-accelerated string scanning**: Uses SIMD instructions to find
 //!   quoted strings and escape characters faster than linear scanning.
 //! - **Whitespace skipping**: Optimized whitespace skipping using SIMD.
-//! - **Field matching**: Linear O(n) comparison for field name matching.
-//! - **Error handling**: Comprehensive error types for malformed JSON.
+//! - **Field matching**: Binary search O(log n) comparison for field name matching.
+//! - **Serde-compatible Attributes**: Full support for `#[fastserial(rename = "...")]`,
+//!   `#[fastserial(rename_all = "...")]`, `#[fastserial(default)]`, and `#[fastserial(skip)]`.
+//! - **Zero-copy Deserialization**: Borrows directly from the underlying buffer
+//!   into strings (`&str`) to minimize allocations.
+//! - **Error handling**: Comprehensive error types for malformed JSON, including
+//!   detailed `MissingField` diagnostics.
 //!
 //! # Example
 //!
@@ -18,13 +23,18 @@
 //! use fastserial::Decode;
 //!
 //! #[derive(Decode)]
-//! struct Point {
-//!     x: i32,
-//!     y: i32,
+//! #[fastserial(rename_all = "camelCase")]
+//! struct User {
+//!     id: u64,
+//!     #[fastserial(rename = "username")]
+//!     name: String,
+//!     #[fastserial(default)]
+//!     age: u32,
 //! }
 //!
-//! let json = br#"{"x":1,"y":2}"#;
-//! let point = Point::decode(&mut ReadBuffer::new(json)).unwrap();
+//! let json = br#"{"id":1,"username":"admin"}"#;
+//! let user = User::decode(&mut ReadBuffer::new(json), &arena).unwrap();
+//! assert_eq!(user.age, 0); // Fell back to default!
 //! ```
 
 use proc_macro2::TokenStream;
