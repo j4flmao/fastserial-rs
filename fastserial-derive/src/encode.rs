@@ -30,13 +30,15 @@ struct FieldInfo {
     ty: syn::Type,
     encoded_name: String,
     skip: bool,
+    skip_serializing_if: Option<String>,
 }
 
-fn parse_field_attrs(field: &syn::Field) -> FieldInfo {
+fn parse_field_attrs(field: &syn::Field, rename_all: &crate::case::RenameRule) -> FieldInfo {
     let field_name = field.ident.as_ref().unwrap().clone();
     let field_ty = field.ty.clone();
-    let mut encoded_name = field_name.to_string();
+    let mut encoded_name = rename_all.apply_to_field(&field_name.to_string());
     let mut skip = false;
+    let mut skip_serializing_if = None;
 
     for attr in &field.attrs {
         if attr.meta.path().is_ident("fastserial") {
@@ -46,6 +48,9 @@ fn parse_field_attrs(field: &syn::Field) -> FieldInfo {
                 } else if meta.path.is_ident("rename") {
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     encoded_name = lit.value();
+                } else if meta.path.is_ident("skip_serializing_if") {
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    skip_serializing_if = Some(lit.value());
                 }
                 // Ignore default, alias, deny_unknown_fields — no effect on encode
                 Ok(())
@@ -58,6 +63,7 @@ fn parse_field_attrs(field: &syn::Field) -> FieldInfo {
         ty: field_ty,
         encoded_name,
         skip,
+        skip_serializing_if,
     }
 }
 
@@ -68,10 +74,16 @@ enum EnumTagging {
     Untagged,
 }
 
-fn parse_container_attrs(attrs: &[syn::Attribute]) -> EnumTagging {
+struct ContainerAttrs {
+    tagging: EnumTagging,
+    rename_all: crate::case::RenameRule,
+}
+
+fn parse_container_attrs(attrs: &[syn::Attribute]) -> ContainerAttrs {
     let mut tag: Option<String> = None;
     let mut content: Option<String> = None;
     let mut untagged = false;
+    let mut rename_all = crate::case::RenameRule::None;
 
     for attr in attrs {
         if attr.meta.path().is_ident("fastserial") {
@@ -84,13 +96,18 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> EnumTagging {
                     content = Some(lit.value());
                 } else if meta.path.is_ident("untagged") {
                     untagged = true;
+                } else if meta.path.is_ident("rename_all") {
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    if let Some(rule) = crate::case::RenameRule::from_str(&lit.value()) {
+                        rename_all = rule;
+                    }
                 }
                 Ok(())
             });
         }
     }
 
-    if untagged {
+    let tagging = if untagged {
         EnumTagging::Untagged
     } else if let Some(t) = tag {
         if let Some(c) = content {
@@ -100,7 +117,9 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> EnumTagging {
         }
     } else {
         EnumTagging::External
-    }
+    };
+
+    ContainerAttrs { tagging, rename_all }
 }
 
 fn get_variant_name(variant: &syn::Variant) -> String {
@@ -119,27 +138,66 @@ fn get_variant_name(variant: &syn::Variant) -> String {
     name
 }
 
-fn encode_variant_fields_as_object(fields: &Fields, prefix: &TokenStream) -> TokenStream {
+fn encode_variant_fields_as_object(fields: &Fields, prefix: &TokenStream, rename_all: &crate::case::RenameRule) -> TokenStream {
     match fields {
         Fields::Named(named) => {
             let mut body = quote! {};
+            let any_skip_if = named.named.iter().any(|f| parse_field_attrs(f, rename_all).skip_serializing_if.is_some());
+            
+            if any_skip_if {
+                body.extend(quote! { let mut __fastserial_first = true; });
+            }
+
             let mut first = true;
             for f in &named.named {
-                let info = parse_field_attrs(f);
+                let info = parse_field_attrs(f, rename_all);
                 if info.skip {
                     continue;
                 }
                 let fname = &info.ident;
-                let key = if first {
-                    format!("\"{}\":", info.encoded_name)
+                let field_name_str = &info.encoded_name;
+
+                if let Some(cond_path) = &info.skip_serializing_if {
+                    let cond: syn::Path = syn::parse_str(cond_path).unwrap();
+                    let key_first = format!("\"{}\":", field_name_str);
+                    let key_next = format!(",\"{}\":", field_name_str);
+                    body.extend(quote! {
+                        if !#cond(&#prefix #fname) {
+                            if __fastserial_first {
+                                w.write_bytes(#key_first.as_bytes())?;
+                                __fastserial_first = false;
+                            } else {
+                                w.write_bytes(#key_next.as_bytes())?;
+                            }
+                            #prefix #fname.encode(w)?;
+                        }
+                    });
                 } else {
-                    format!(",\"{}\":", info.encoded_name)
-                };
+                    if any_skip_if {
+                        let key_first = format!("\"{}\":", field_name_str);
+                        let key_next = format!(",\"{}\":", field_name_str);
+                        body.extend(quote! {
+                            if __fastserial_first {
+                                w.write_bytes(#key_first.as_bytes())?;
+                                __fastserial_first = false;
+                            } else {
+                                w.write_bytes(#key_next.as_bytes())?;
+                            }
+                            #prefix #fname.encode(w)?;
+                        });
+                    } else {
+                        let key = if first {
+                            format!("\"{}\":", field_name_str)
+                        } else {
+                            format!(",\"{}\":", field_name_str)
+                        };
+                        body.extend(quote! {
+                            w.write_bytes(#key.as_bytes())?;
+                            #prefix #fname.encode(w)?;
+                        });
+                    }
+                }
                 first = false;
-                body.extend(quote! {
-                    w.write_bytes(#key.as_bytes())?;
-                    #prefix #fname.encode(w)?;
-                });
             }
             quote! {
                 w.write_byte(b'{')?;
@@ -183,7 +241,8 @@ fn encode_variant_fields_as_object(fields: &Fields, prefix: &TokenStream) -> Tok
 fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream {
     let name = &input.ident;
     let (impl_gens, ty_gens, where_clause) = input.generics.split_for_impl();
-    let tagging = parse_container_attrs(&input.attrs);
+    let container_attrs = parse_container_attrs(&input.attrs);
+    let tagging = container_attrs.tagging;
 
     let mut match_arms = quote! {};
 
@@ -210,7 +269,7 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
                     let key = format!("\"{}\":", vname);
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {});
+                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
                     let body = quote! {
                         w.write_byte(b'{')?;
                         w.write_bytes(#key.as_bytes())?;
@@ -275,7 +334,7 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                     let tag_entry = format!("\"{}\":\"{}\"", tag, vname);
                     let mut field_body = quote! {};
                     for f in &named.named {
-                        let info = parse_field_attrs(f);
+                        let info = parse_field_attrs(f, &container_attrs.rename_all);
                         if info.skip {
                             continue;
                         }
@@ -329,7 +388,7 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
                     let tag_entry = format!("\"{}\":\"{}\",\"{}\":", tag, vname, content);
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {});
+                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
                     let body = quote! {
                         w.write_byte(b'{')?;
                         w.write_bytes(#tag_entry.as_bytes())?;
@@ -388,7 +447,7 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .map(|f| f.ident.as_ref().unwrap())
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {});
+                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
                     (pat, inner)
                 }
                 Fields::Unnamed(unnamed) => {
@@ -458,9 +517,10 @@ pub fn derive_encode(input: DeriveInput) -> TokenStream {
         Data::Struct(s) => {
             let fields = &s.fields;
             let mut field_infos: Vec<FieldInfo> = Vec::new();
+            let container_attrs = parse_container_attrs(&input.attrs);
 
             for field in fields.iter() {
-                field_infos.push(parse_field_attrs(field));
+                field_infos.push(parse_field_attrs(field, &container_attrs.rename_all));
             }
 
             let mut encode_body = quote! {};
@@ -471,6 +531,13 @@ pub fn derive_encode(input: DeriveInput) -> TokenStream {
             // Collect data for schema hash
             let type_name_str = name.to_string();
             let mut hash_fields: Vec<(String, String)> = Vec::new();
+
+            let any_skip_if = field_infos.iter().any(|f| f.skip_serializing_if.is_some());
+
+            if any_skip_if {
+                encode_body.extend(quote! { let mut __fastserial_first = true; });
+                format_body.extend(quote! { let mut __fastserial_first = true; });
+            }
 
             for info in &field_infos {
                 if info.skip {
@@ -483,30 +550,84 @@ pub fn derive_encode(input: DeriveInput) -> TokenStream {
 
                 hash_fields.push((info.encoded_name.clone(), quote!(#ty).to_string()));
 
-                // encode body
-                let key = if first {
-                    format!("\"{}\":", field_name_str)
+                if let Some(cond_path) = &info.skip_serializing_if {
+                    let cond: syn::Path = syn::parse_str(cond_path).unwrap();
+                    if any_skip_if {
+                        let key_first = format!("\"{}\":", field_name_str);
+                        let key_next = format!(",\"{}\":", field_name_str);
+                        encode_body.extend(quote! {
+                            if !#cond(&self.#field_name) {
+                                if __fastserial_first {
+                                    w.write_bytes(#key_first.as_bytes())?;
+                                    __fastserial_first = false;
+                                } else {
+                                    w.write_bytes(#key_next.as_bytes())?;
+                                }
+                                self.#field_name.encode(w)?;
+                            }
+                        });
+                        format_body.extend(quote! {
+                            if !#cond(&self.#field_name) {
+                                if __fastserial_first {
+                                    F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                                    __fastserial_first = false;
+                                } else {
+                                    F::field_separator(w)?;
+                                    F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                                }
+                                self.#field_name.encode_with_format::<F, W>(w)?;
+                            }
+                        });
+                    }
                 } else {
-                    format!(",\"{}\":", field_name_str)
-                };
+                    if any_skip_if {
+                        let key_first = format!("\"{}\":", field_name_str);
+                        let key_next = format!(",\"{}\":", field_name_str);
+                        encode_body.extend(quote! {
+                            if __fastserial_first {
+                                w.write_bytes(#key_first.as_bytes())?;
+                                __fastserial_first = false;
+                            } else {
+                                w.write_bytes(#key_next.as_bytes())?;
+                            }
+                            self.#field_name.encode(w)?;
+                        });
+                        format_body.extend(quote! {
+                            if __fastserial_first {
+                                F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                                __fastserial_first = false;
+                            } else {
+                                F::field_separator(w)?;
+                                F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                            }
+                            self.#field_name.encode_with_format::<F, W>(w)?;
+                        });
+                    } else {
+                        // Original compile-time comma logic for max performance
+                        let key = if first {
+                            format!("\"{}\":", field_name_str)
+                        } else {
+                            format!(",\"{}\":", field_name_str)
+                        };
 
-                encode_body.extend(quote! {
-                    w.write_bytes(#key.as_bytes())?;
-                    self.#field_name.encode(w)?;
-                });
+                        encode_body.extend(quote! {
+                            w.write_bytes(#key.as_bytes())?;
+                            self.#field_name.encode(w)?;
+                        });
 
-                // encode_with_format body - use field_name_str directly
-                if first {
-                    format_body.extend(quote! {
-                        F::write_field_key(&#field_name_str.as_bytes(), w)?;
-                        self.#field_name.encode_with_format::<F, W>(w)?;
-                    });
-                } else {
-                    format_body.extend(quote! {
-                        F::field_separator(w)?;
-                        F::write_field_key(&#field_name_str.as_bytes(), w)?;
-                        self.#field_name.encode_with_format::<F, W>(w)?;
-                    });
+                        if first {
+                            format_body.extend(quote! {
+                                F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                                self.#field_name.encode_with_format::<F, W>(w)?;
+                            });
+                        } else {
+                            format_body.extend(quote! {
+                                F::field_separator(w)?;
+                                F::write_field_key(&#field_name_str.as_bytes(), w)?;
+                                self.#field_name.encode_with_format::<F, W>(w)?;
+                            });
+                        }
+                    }
                 }
 
                 first = false;

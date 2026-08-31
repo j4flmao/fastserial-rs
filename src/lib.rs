@@ -130,6 +130,8 @@ pub mod arena;
 
 mod error;
 mod format;
+pub mod stream;
+pub mod tape;
 pub mod value;
 
 pub use error::Error;

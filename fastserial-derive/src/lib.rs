@@ -27,6 +27,8 @@
 
 extern crate proc_macro;
 
+mod attrs;
+mod case;
 mod decode;
 mod encode;
 
