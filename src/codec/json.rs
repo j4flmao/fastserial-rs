@@ -333,6 +333,13 @@ pub fn skip_colon(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
                 let b2 = unsafe { *r.data.get_unchecked(r.pos) };
                 if b2 == b' ' {
                     r.pos += 1;
+                    // If there's more whitespace after the space, skip it fully
+                    if r.pos < r.data.len() {
+                        let b3 = unsafe { *r.data.get_unchecked(r.pos) };
+                        if is_json_ws(b3) {
+                            skip_whitespace(r);
+                        }
+                    }
                 } else if is_json_ws(b2) {
                     skip_whitespace(r);
                 }
@@ -340,6 +347,7 @@ pub fn skip_colon(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
             return Ok(());
         }
     }
+    skip_whitespace(r);
     r.expect_byte(b':')?;
     skip_whitespace(r);
     Ok(())
@@ -357,6 +365,12 @@ pub fn skip_comma_or_close(r: &mut ReadBuffer<'_>, close: u8) -> Result<bool, Er
                 let b2 = unsafe { *r.data.get_unchecked(r.pos) };
                 if b2 == b' ' {
                     r.pos += 1;
+                    if r.pos < r.data.len() {
+                        let b3 = unsafe { *r.data.get_unchecked(r.pos) };
+                        if is_json_ws(b3) {
+                            skip_whitespace(r);
+                        }
+                    }
                 } else if is_json_ws(b2) {
                     skip_whitespace(r);
                 }
