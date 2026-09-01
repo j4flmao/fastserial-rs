@@ -42,7 +42,6 @@ pub fn parse_container_attrs(attrs: &[Attribute]) -> ContainerAttrs {
 pub struct FieldAttrs {
     pub rename: Option<String>,
     pub skip: bool,
-    pub skip_serializing_if: Option<String>,
     pub default: bool,
     pub default_path: Option<String>,
 }
@@ -50,7 +49,6 @@ pub struct FieldAttrs {
 pub fn parse_field_attrs_raw(field: &Field) -> FieldAttrs {
     let mut rename = None;
     let mut skip = false;
-    let mut skip_serializing_if = None;
     let mut default = false;
     let mut default_path = None;
 
@@ -63,8 +61,7 @@ pub fn parse_field_attrs_raw(field: &Field) -> FieldAttrs {
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     rename = Some(lit.value());
                 } else if meta.path.is_ident("skip_serializing_if") {
-                    let lit: syn::LitStr = meta.value()?.parse()?;
-                    skip_serializing_if = Some(lit.value());
+                    let _lit: syn::LitStr = meta.value()?.parse()?;
                 } else if meta.path.is_ident("default") {
                     if let Ok(value) = meta.value() {
                         let lit: syn::LitStr = value.parse()?;
@@ -81,7 +78,6 @@ pub fn parse_field_attrs_raw(field: &Field) -> FieldAttrs {
     FieldAttrs {
         rename,
         skip,
-        skip_serializing_if,
         default,
         default_path,
     }

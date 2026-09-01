@@ -24,7 +24,7 @@
 //! ```
 
 use crate::io::{ReadBuffer, WriteBuffer};
-use crate::{Decode, Encode, Error, Format};
+use crate::{Encode, Error, Format};
 
 /// CBOR format implementation.
 pub struct CborFormat;

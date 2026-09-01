@@ -201,7 +201,6 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
             fn decode(r: &mut ::fastserial::io::ReadBuffer<'de>, _arena: &'de ::fastserial::arena::Arena) -> ::core::result::Result<Self, ::fastserial::Error> {
                 #field_inits
 
-                ::fastserial::codec::json::skip_whitespace(r);
                 r.expect_byte(b'{')?;
                 ::fastserial::codec::json::skip_whitespace(r);
 

@@ -158,18 +158,26 @@ impl Arena {
     /// Drops all chunks except the largest, which is reused. Invalidates
     /// every reference previously handed out.
     pub fn reset(&mut self) {
-        // Pick the biggest chunk to keep; drop the rest.
-        let mut keep = mem::replace(
-            &mut *self.current.borrow_mut(),
-            Chunk::with_capacity(DEFAULT_CHUNK_SIZE),
-        );
-        for c in self.chunks.borrow_mut().drain(..) {
-            if c.capacity() > keep.capacity() {
-                keep = c;
+        let current = self.current.get_mut();
+        let chunks = self.chunks.get_mut();
+
+        let mut max_idx = None;
+        let mut max_cap = current.capacity();
+
+        for (i, c) in chunks.iter().enumerate() {
+            if c.capacity() > max_cap {
+                max_cap = c.capacity();
+                max_idx = Some(i);
             }
         }
-        keep.reset();
-        *self.current.borrow_mut() = keep;
+
+        if let Some(idx) = max_idx {
+            let mut best = chunks.swap_remove(idx);
+            core::mem::swap(current, &mut best);
+        }
+
+        current.reset();
+        chunks.clear();
     }
 
     /// Total bytes used across all chunks, including alignment padding.
