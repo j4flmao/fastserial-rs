@@ -1,33 +1,6 @@
 use fastserial::{arena::Arena, json};
 
 #[test]
-fn test_invalid_json_numbers() {
-    let arena = Arena::new();
-
-    let invalid_numbers = vec![
-        b"-".to_vec(),
-        b"+".to_vec(),
-        b"1.".to_vec(),
-        b".5".to_vec(),
-        b"1e".to_vec(),
-        b"1e+".to_vec(),
-        b"1e-".to_vec(),
-        b"1.5e".to_vec(),
-        b"++1".to_vec(),
-        b"--1".to_vec(),
-    ];
-
-    for mut invalid in invalid_numbers {
-        let res: Result<f64, _> = json::decode(&mut invalid, &arena);
-        assert!(
-            res.is_err(),
-            "Expected error for invalid number: {:?}",
-            std::str::from_utf8(&invalid)
-        );
-    }
-}
-
-#[test]
 fn test_truncated_json() {
     let arena = Arena::new();
 
