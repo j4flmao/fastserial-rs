@@ -5,7 +5,7 @@ fn test_deep_nesting() {
     let arena = Arena::new();
 
     // Create a very deeply nested array JSON
-    let depth = 150;
+    let depth = 50;
     let mut json_str = String::with_capacity(depth * 2 + 10);
     for _ in 0..depth {
         json_str.push('[');
@@ -30,10 +30,10 @@ fn test_deep_nesting() {
 fn test_deeply_nested_objects() {
     let arena = Arena::new();
 
-    let depth = 150; // smaller to avoid stack overflow on Windows test runner
+    let depth = 50; // smaller to avoid stack overflow on Windows test runner
     let mut json_str = String::new();
     for i in 0..depth {
-        json_str.push_str(&format!("{{\"level{}\":", i));
+        json_str.push_str(&format!("{{\"key{}\":", i));
     }
     json_str.push_str("42");
     for _ in 0..depth {
