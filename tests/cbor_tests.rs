@@ -31,8 +31,8 @@ fn test_cbor_errors() {
     let bytes = vec![0b101_11111, 0x61]; // map start, string start but missing bytes
     assert!(fastserial::codec::cbor::decode(&bytes).is_err());
 
-    // 2. Invalid Float bytes
-    let bytes = vec![0b111_11011, 0xFF, 0, 0, 0, 0, 0, 0, 0]; // 27 (f64) but invalid maybe? Wait, f64 can be anything.
+    // 2. Trailing garbage
+    let _bytes = vec![0b111_11011, 0xFF, 0, 0, 0, 0, 0, 0, 0]; // 27 (f64) but invalid maybe? Wait, f64 can be anything.
     // 3. Unsupported Type (e.g. f16)
     let bytes = vec![0b111_11001, 0, 0]; // 25 is unsupported in our decoder
     assert!(fastserial::codec::cbor::decode(&bytes).is_err());
