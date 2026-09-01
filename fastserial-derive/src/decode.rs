@@ -98,9 +98,11 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
         let field_name = field.ident.as_ref().unwrap();
         let field_ty = &field.ty;
         let field_attrs = crate::attrs::parse_field_attrs_raw(field);
-        
+
         let skip = field_attrs.skip;
-        let mut field_name_str = container_attrs.rename_all.apply_to_field(&field_name.to_string());
+        let mut field_name_str = container_attrs
+            .rename_all
+            .apply_to_field(&field_name.to_string());
         if let Some(r) = field_attrs.rename {
             field_name_str = r;
         }

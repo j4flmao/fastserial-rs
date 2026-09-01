@@ -152,7 +152,10 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> ContainerAttrs {
         EnumTagging::External
     };
 
-    ContainerAttrs { tagging, rename_all }
+    ContainerAttrs {
+        tagging,
+        rename_all,
+    }
 }
 
 fn get_variant_name(variant: &syn::Variant) -> String {
@@ -171,12 +174,20 @@ fn get_variant_name(variant: &syn::Variant) -> String {
     name
 }
 
-fn encode_variant_fields_as_object(fields: &Fields, prefix: &TokenStream, rename_all: &crate::case::RenameRule) -> TokenStream {
+fn encode_variant_fields_as_object(
+    fields: &Fields,
+    prefix: &TokenStream,
+    rename_all: &crate::case::RenameRule,
+) -> TokenStream {
     match fields {
         Fields::Named(named) => {
             let mut body = quote! {};
-            let any_skip_if = named.named.iter().any(|f| parse_field_attrs(f, rename_all).skip_serializing_if.is_some());
-            
+            let any_skip_if = named.named.iter().any(|f| {
+                parse_field_attrs(f, rename_all)
+                    .skip_serializing_if
+                    .is_some()
+            });
+
             if any_skip_if {
                 body.extend(quote! { let mut __fastserial_first = true; });
             }
@@ -302,7 +313,11 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
                     let key = format!("\"{}\":", vname);
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
+                    let inner = encode_variant_fields_as_object(
+                        &variant.fields,
+                        &quote! {},
+                        &container_attrs.rename_all,
+                    );
                     let body = quote! {
                         w.write_byte(b'{')?;
                         w.write_bytes(#key.as_bytes())?;
@@ -421,7 +436,11 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
                     let tag_entry = format!("\"{}\":\"{}\",\"{}\":", tag, vname, content);
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
+                    let inner = encode_variant_fields_as_object(
+                        &variant.fields,
+                        &quote! {},
+                        &container_attrs.rename_all,
+                    );
                     let body = quote! {
                         w.write_byte(b'{')?;
                         w.write_bytes(#tag_entry.as_bytes())?;
@@ -480,7 +499,11 @@ fn derive_encode_enum(input: &DeriveInput, data: &syn::DataEnum) -> TokenStream 
                         .map(|f| f.ident.as_ref().unwrap())
                         .collect();
                     let pat = quote! { #name::#vident { #(ref #field_idents),* } };
-                    let inner = encode_variant_fields_as_object(&variant.fields, &quote! {}, &container_attrs.rename_all);
+                    let inner = encode_variant_fields_as_object(
+                        &variant.fields,
+                        &quote! {},
+                        &container_attrs.rename_all,
+                    );
                     (pat, inner)
                 }
                 Fields::Unnamed(unnamed) => {

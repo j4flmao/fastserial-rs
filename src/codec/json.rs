@@ -829,11 +829,14 @@ pub fn read_string_cow<'de>(
                     let hex = &r.data[r.pos..r.pos + 4];
                     let mut code = unescape_hex(hex)?;
                     r.pos += 4;
-                    
+
                     // Check for high surrogate
                     if (0xD800..=0xDBFF).contains(&code) {
                         // Look for \uXXXX low surrogate
-                        if r.pos + 6 <= r.data.len() && r.data[r.pos] == b'\\' && r.data[r.pos + 1] == b'u' {
+                        if r.pos + 6 <= r.data.len()
+                            && r.data[r.pos] == b'\\'
+                            && r.data[r.pos + 1] == b'u'
+                        {
                             let low_hex = &r.data[r.pos + 2..r.pos + 6];
                             if let Ok(low_code) = unescape_hex(low_hex) {
                                 if (0xDC00..=0xDFFF).contains(&low_code) {

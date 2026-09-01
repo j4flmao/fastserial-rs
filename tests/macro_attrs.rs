@@ -8,7 +8,7 @@ fn is_false(v: &bool) -> bool {
 #[fastserial(rename_all = "camelCase")]
 struct Config {
     pub server_url: String,
-    
+
     #[fastserial(default)]
     pub max_connections: u32,
 
@@ -27,17 +27,23 @@ fn test_rename_all_and_default() {
     assert_eq!(config.enable_logging, false);
 
     config.max_connections = 100;
-    
+
     let encoded = json::encode(&config).unwrap();
     let encoded_str = std::str::from_utf8(&encoded).unwrap();
-    
+
     // enable_logging is false, so it should be skipped
-    assert_eq!(encoded_str, r#"{"serverUrl":"http://localhost:8080","maxConnections":100}"#);
+    assert_eq!(
+        encoded_str,
+        r#"{"serverUrl":"http://localhost:8080","maxConnections":100}"#
+    );
 
     config.enable_logging = true;
     let encoded2 = json::encode(&config).unwrap();
     let encoded_str2 = std::str::from_utf8(&encoded2).unwrap();
-    
+
     // enable_logging is true, so it should be serialized
-    assert_eq!(encoded_str2, r#"{"serverUrl":"http://localhost:8080","maxConnections":100,"enableLogging":true}"#);
+    assert_eq!(
+        encoded_str2,
+        r#"{"serverUrl":"http://localhost:8080","maxConnections":100,"enableLogging":true}"#
+    );
 }

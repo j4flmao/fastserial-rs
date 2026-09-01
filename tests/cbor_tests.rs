@@ -1,4 +1,4 @@
-use fastserial::value::{Value, Number};
+use fastserial::value::{Number, Value};
 use std::collections::BTreeMap;
 
 #[test]
@@ -11,17 +11,17 @@ fn test_cbor_encode_decode() {
     map.insert("pi".to_string(), Value::Number(Number::F64(3.14159)));
     map.insert("is_fast".to_string(), Value::Bool(true));
     map.insert("none".to_string(), Value::Null);
-    
+
     let mut arr = Vec::new();
     arr.push(Value::Number(Number::U64(1)));
     arr.push(Value::String("two".to_string()));
     map.insert("list".to_string(), Value::Array(arr));
-    
+
     let original = Value::Object(map);
-    
+
     let encoded = fastserial::codec::cbor::encode(&original).unwrap();
     let decoded = fastserial::codec::cbor::decode(&encoded).unwrap();
-    
+
     assert_eq!(original, decoded);
 }
 
@@ -36,7 +36,7 @@ fn test_cbor_errors() {
     // 3. Unsupported Type (e.g. f16)
     let bytes = vec![0b111_11001, 0, 0]; // 25 is unsupported in our decoder
     assert!(fastserial::codec::cbor::decode(&bytes).is_err());
-    
+
     // 4. Invalid integer sizes
     let bytes = vec![28]; // Invalid size
     assert!(fastserial::codec::cbor::decode(&bytes).is_err());

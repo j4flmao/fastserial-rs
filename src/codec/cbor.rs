@@ -17,7 +17,7 @@
 //! ```ignore
 //! use fastserial::codec::cbor;
 //! use fastserial::value::Value;
-//! 
+//!
 //! let my_obj = Value::Null; // Construct a Value tree
 //! let encoded_bytes = cbor::encode(&my_obj).unwrap();
 //! let decoded_val = cbor::decode(&encoded_bytes).unwrap();
@@ -196,21 +196,29 @@ impl Format for CborFormat {
             24 => Ok(r.next_byte()? as u64),
             25 => {
                 let bytes = r.peek_slice(2);
-                if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 2 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(2);
                 Ok(u16::from_be_bytes([bytes[0], bytes[1]]) as u64)
             }
             26 => {
                 let bytes = r.peek_slice(4);
-                if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 4 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(4);
                 Ok(u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64)
             }
             27 => {
                 let bytes = r.peek_slice(8);
-                if bytes.len() < 8 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 8 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(8);
-                Ok(u64::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]))
+                Ok(u64::from_be_bytes([
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                ]))
             }
             _ => Err(Error::UnexpectedByte),
         }
@@ -230,21 +238,30 @@ impl Format for CborFormat {
                 24 => r.next_byte()? as u64,
                 25 => {
                     let bytes = r.peek_slice(2);
-                    if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 2 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(2);
                     u16::from_be_bytes([bytes[0], bytes[1]]) as u64
                 }
                 26 => {
                     let bytes = r.peek_slice(4);
-                    if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 4 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(4);
                     u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as u64
                 }
                 27 => {
                     let bytes = r.peek_slice(8);
-                    if bytes.len() < 8 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 8 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(8);
-                    u64::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]])
+                    u64::from_be_bytes([
+                        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6],
+                        bytes[7],
+                    ])
                 }
                 _ => return Err(Error::UnexpectedByte),
             };
@@ -263,12 +280,18 @@ impl Format for CborFormat {
         let v = b & 0x1F;
         if v == 27 {
             let bytes = r.peek_slice(8);
-            if bytes.len() < 8 { return Err(Error::UnexpectedEof); }
+            if bytes.len() < 8 {
+                return Err(Error::UnexpectedEof);
+            }
             r.advance(8);
-            Ok(f64::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]))
+            Ok(f64::from_be_bytes([
+                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            ]))
         } else if v == 26 {
             let bytes = r.peek_slice(4);
-            if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+            if bytes.len() < 4 {
+                return Err(Error::UnexpectedEof);
+            }
             r.advance(4);
             Ok(f32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as f64)
         } else if v == 25 {
@@ -290,27 +313,37 @@ impl Format for CborFormat {
             24 => r.next_byte()? as usize,
             25 => {
                 let bytes = r.peek_slice(2);
-                if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 2 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(2);
                 u16::from_be_bytes([bytes[0], bytes[1]]) as usize
             }
             26 => {
                 let bytes = r.peek_slice(4);
-                if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 4 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(4);
                 u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
             }
             27 => {
                 let bytes = r.peek_slice(8);
-                if bytes.len() < 8 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 8 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(8);
-                u64::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]) as usize
+                u64::from_be_bytes([
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                ]) as usize
             }
             _ => return Err(Error::UnexpectedByte),
         };
 
         let data = r.peek_slice(len);
-        if data.len() < len { return Err(Error::UnexpectedEof); }
+        if data.len() < len {
+            return Err(Error::UnexpectedEof);
+        }
         let s = core::str::from_utf8(data).map_err(|_| Error::InvalidUtf8)?;
         r.advance(len);
         Ok(s)
@@ -328,27 +361,37 @@ impl Format for CborFormat {
             24 => r.next_byte()? as usize,
             25 => {
                 let bytes = r.peek_slice(2);
-                if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 2 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(2);
                 u16::from_be_bytes([bytes[0], bytes[1]]) as usize
             }
             26 => {
                 let bytes = r.peek_slice(4);
-                if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 4 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(4);
                 u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
             }
             27 => {
                 let bytes = r.peek_slice(8);
-                if bytes.len() < 8 { return Err(Error::UnexpectedEof); }
+                if bytes.len() < 8 {
+                    return Err(Error::UnexpectedEof);
+                }
                 r.advance(8);
-                u64::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]) as usize
+                u64::from_be_bytes([
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                ]) as usize
             }
             _ => return Err(Error::UnexpectedByte),
         };
 
         let data = r.peek_slice(len);
-        if data.len() < len { return Err(Error::UnexpectedEof); }
+        if data.len() < len {
+            return Err(Error::UnexpectedEof);
+        }
         r.advance(len);
         Ok(data)
     }
@@ -368,13 +411,17 @@ impl Format for CborFormat {
                 24 => r.next_byte()? as usize,
                 25 => {
                     let bytes = r.peek_slice(2);
-                    if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 2 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(2);
                     u16::from_be_bytes([bytes[0], bytes[1]]) as usize
                 }
                 26 => {
                     let bytes = r.peek_slice(4);
-                    if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 4 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(4);
                     u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
                 }
@@ -399,13 +446,17 @@ impl Format for CborFormat {
                 24 => r.next_byte()? as usize,
                 25 => {
                     let bytes = r.peek_slice(2);
-                    if bytes.len() < 2 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 2 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(2);
                     u16::from_be_bytes([bytes[0], bytes[1]]) as usize
                 }
                 26 => {
                     let bytes = r.peek_slice(4);
-                    if bytes.len() < 4 { return Err(Error::UnexpectedEof); }
+                    if bytes.len() < 4 {
+                        return Err(Error::UnexpectedEof);
+                    }
                     r.advance(4);
                     u32::from_be_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize
                 }
@@ -517,9 +568,18 @@ fn decode_value(r: &mut ReadBuffer<'_>) -> Result<crate::value::Value, Error> {
         7 => {
             let v = b & 0x1F;
             match v {
-                20 => { r.advance(1); Ok(crate::value::Value::Bool(false)) }
-                21 => { r.advance(1); Ok(crate::value::Value::Bool(true)) }
-                22 => { r.advance(1); Ok(crate::value::Value::Null) }
+                20 => {
+                    r.advance(1);
+                    Ok(crate::value::Value::Bool(false))
+                }
+                21 => {
+                    r.advance(1);
+                    Ok(crate::value::Value::Bool(true))
+                }
+                22 => {
+                    r.advance(1);
+                    Ok(crate::value::Value::Null)
+                }
                 26 | 27 => {
                     let f = CborFormat::read_f64(r)?;
                     Ok(crate::value::Value::Number(crate::value::Number::F64(f)))

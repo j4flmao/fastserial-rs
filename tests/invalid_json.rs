@@ -1,9 +1,9 @@
-use fastserial::{json, arena::Arena};
+use fastserial::{arena::Arena, json};
 
 #[test]
 fn test_invalid_json_numbers() {
     let arena = Arena::new();
-    
+
     let invalid_numbers = vec![
         b"-".to_vec(),
         b"+".to_vec(),
@@ -16,17 +16,21 @@ fn test_invalid_json_numbers() {
         b"++1".to_vec(),
         b"--1".to_vec(),
     ];
-    
+
     for mut invalid in invalid_numbers {
         let res: Result<f64, _> = json::decode(&mut invalid, &arena);
-        assert!(res.is_err(), "Expected error for invalid number: {:?}", std::str::from_utf8(&invalid));
+        assert!(
+            res.is_err(),
+            "Expected error for invalid number: {:?}",
+            std::str::from_utf8(&invalid)
+        );
     }
 }
 
 #[test]
 fn test_truncated_json() {
     let arena = Arena::new();
-    
+
     let truncated = vec![
         b"[1, 2, ".to_vec(),
         b"{\"a\": ".to_vec(),
@@ -34,7 +38,7 @@ fn test_truncated_json() {
         b"\"hello".to_vec(),
         b"true ".to_vec(), // wait, true is valid if it's the whole document
     ];
-    
+
     for mut trunc in truncated.into_iter().take(4) {
         // We decode into a generic structure like tape or just expect it to fail for specific types
         let res: Result<Vec<i32>, _> = json::decode(&mut trunc, &arena);

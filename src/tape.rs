@@ -53,7 +53,7 @@ impl<'a> TapeNode<'a> {
     pub fn get(&self, key: &str) -> Option<&TapeNode<'a>> {
         match self {
             TapeNode::Object(map) => {
-                // Linear search is fast for small objects. 
+                // Linear search is fast for small objects.
                 // For a true Tape, we could sort the keys or just rely on small N.
                 for (k, v) in *map {
                     if *k == key {
@@ -75,10 +75,7 @@ impl<'a> TapeNode<'a> {
 }
 
 impl<'de> Decode<'de> for TapeNode<'de> {
-    fn decode(
-        r: &mut io::ReadBuffer<'de>,
-        arena: &'de crate::arena::Arena,
-    ) -> Result<Self, Error> {
+    fn decode(r: &mut io::ReadBuffer<'de>, arena: &'de crate::arena::Arena) -> Result<Self, Error> {
         crate::codec::json::skip_whitespace(r);
         match r.peek() {
             b'"' => {
@@ -117,7 +114,7 @@ impl<'de> Decode<'de> for TapeNode<'de> {
                             unsafe { core::str::from_utf8_unchecked(ptr) }
                         }
                     };
-                    
+
                     crate::codec::json::skip_colon(r)?;
                     let val = TapeNode::decode(r, arena)?;
                     map.push((key_ref, val));

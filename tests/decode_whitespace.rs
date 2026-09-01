@@ -1,5 +1,5 @@
-use fastserial::{json, Decode, arena::Arena};
-use std::collections::{HashMap, BTreeMap};
+use fastserial::{Decode, arena::Arena, json};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Decode, PartialEq, Debug)]
 struct TestStruct {
@@ -11,7 +11,7 @@ struct TestStruct {
 #[test]
 fn test_decode_extreme_whitespace() {
     let arena = Arena::new();
-    
+
     // Arrays
     let mut json = b" \n \r \t [ \n 1 \t , \r 2 \n ] \t ".to_vec();
     let val: Vec<i32> = json::decode(&mut json, &arena).unwrap();
@@ -30,7 +30,14 @@ fn test_decode_extreme_whitespace() {
     // Structs
     let mut json = b" { \n \"a\" \t : \r 1 \n , \t \"b\" : true , \"c\" : \"hello\" \n } ".to_vec();
     let val: TestStruct = json::decode(&mut json, &arena).unwrap();
-    assert_eq!(val, TestStruct { a: 1, b: true, c: "hello".to_string() });
+    assert_eq!(
+        val,
+        TestStruct {
+            a: 1,
+            b: true,
+            c: "hello".to_string()
+        }
+    );
 
     // Option
     let mut json = b" \n [ \t null \n , \r 42 \t ] \n ".to_vec();
@@ -51,7 +58,7 @@ fn test_decode_extreme_whitespace() {
 #[test]
 fn test_decode_no_whitespace_at_all() {
     let arena = Arena::new();
-    
+
     // Arrays
     let mut json = b"[1,2]".to_vec();
     let val: Vec<i32> = json::decode(&mut json, &arena).unwrap();
@@ -65,7 +72,14 @@ fn test_decode_no_whitespace_at_all() {
     // Structs
     let mut json = b"{\"a\":1,\"b\":true,\"c\":\"hello\"}".to_vec();
     let val: TestStruct = json::decode(&mut json, &arena).unwrap();
-    assert_eq!(val, TestStruct { a: 1, b: true, c: "hello".to_string() });
+    assert_eq!(
+        val,
+        TestStruct {
+            a: 1,
+            b: true,
+            c: "hello".to_string()
+        }
+    );
 
     // Option
     let mut json = b"[null,42]".to_vec();

@@ -14,7 +14,8 @@ fn test_tape_node() {
             "key": "value"
         }
     }
-    "#.to_vec();
+    "#
+    .to_vec();
 
     let arena = Arena::new();
     let root: TapeNode = json::decode(&mut data, &arena).unwrap();
@@ -31,7 +32,7 @@ fn test_tape_node() {
     let features = root.get("features").unwrap().as_array().unwrap();
     assert_eq!(features.len(), 3);
     assert_eq!(features[0].as_str().unwrap(), "zero-copy");
-    
+
     let nested = root.get("nested").unwrap();
     assert_eq!(nested.get("key").unwrap().as_str().unwrap(), "value");
 }

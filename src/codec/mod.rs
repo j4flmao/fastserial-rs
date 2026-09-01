@@ -5,8 +5,8 @@ pub mod msgpack;
 
 pub mod cbor;
 
-pub use json::*;
 pub use cbor::*;
+pub use json::*;
 
 // Re-export binary primitives
 pub use binary::BinaryFormat;

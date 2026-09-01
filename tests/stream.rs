@@ -1,5 +1,5 @@
-use fastserial::{Decode, arena::Arena};
 use fastserial::stream::NdjsonStream;
+use fastserial::{Decode, arena::Arena};
 
 #[derive(Decode, Debug, PartialEq)]
 struct LogEntry<'a> {
@@ -34,7 +34,7 @@ async fn test_async_ndjson_stream() {
 
     let entry1: LogEntry = stream.next_obj().await.unwrap().unwrap();
     assert_eq!(entry1.level, "INFO");
-    
+
     let entry2: LogEntry = stream.next_obj().await.unwrap().unwrap();
     assert_eq!(entry2.level, "ERROR");
 
