@@ -130,6 +130,8 @@ pub mod arena;
 
 mod error;
 mod format;
+pub mod stream;
+pub mod tape;
 pub mod value;
 
 pub use error::Error;
@@ -415,6 +417,7 @@ pub mod json {
     ) -> Result<T, Error> {
         let len = input.len();
         let mut r = io::ReadBuffer::new(input);
+        codec::json::skip_whitespace(&mut r);
         let val = T::decode(&mut r, arena)?;
         codec::json::skip_whitespace(&mut r);
 
@@ -444,6 +447,7 @@ pub mod json {
     ) -> Result<T, Error> {
         let len = input.len();
         let mut r = io::ReadBuffer::new_validated(unsafe { input.as_bytes_mut() });
+        codec::json::skip_whitespace(&mut r);
         let val = T::decode(&mut r, arena)?;
         codec::json::skip_whitespace(&mut r);
 
@@ -849,7 +853,6 @@ mod option_impl {
             r: &mut io::ReadBuffer<'de>,
             arena: &'de crate::arena::Arena,
         ) -> Result<Self, Error> {
-            codec::json::skip_whitespace(r);
             if r.peek() == b'n' {
                 r.expect_bytes(b"null")?;
                 Ok(None)
@@ -911,16 +914,11 @@ mod vec_impl {
                 return Ok(alloc::vec::Vec::new());
             }
 
-            // Estimate the number of elements to avoid log2(N) reallocations
-            // during push(). We bound the look-ahead so that the cost stays O(N)
-            // overall and so deeply nested workloads do not blow up.
-            let est = codec::json::estimate_array_len(r.data, r.pos, 64 * 1024);
-            let mut vec = alloc::vec::Vec::with_capacity(est.clamp(4, 4096));
+            let mut vec = alloc::vec::Vec::new();
 
             loop {
                 vec.push(T::decode(r, arena)?);
-                codec::json::skip_comma_or_close(r, b']')?;
-                if r.peek() == b']' {
+                if !codec::json::skip_comma_or_close(r, b']')? {
                     r.advance(1);
                     break;
                 }
@@ -1132,7 +1130,6 @@ mod hashmap_impl {
             r: &mut io::ReadBuffer<'de>,
             arena: &'de crate::arena::Arena,
         ) -> Result<Self, Error> {
-            codec::json::skip_whitespace(r);
             r.expect_byte(b'{')?;
             let mut map = HashMap::new();
             codec::json::skip_whitespace(r);
@@ -1141,14 +1138,11 @@ mod hashmap_impl {
                 return Ok(map);
             }
             loop {
-                codec::json::skip_whitespace(r);
                 let key = codec::json::read_string_cow(r)?.into_owned();
-                codec::json::skip_whitespace(r);
-                r.expect_byte(b':')?;
+                codec::json::skip_colon(r)?;
                 let val = V::decode(r, arena)?;
                 map.insert(key, val);
-                codec::json::skip_comma_or_close(r, b'}')?;
-                if r.peek() == b'}' {
+                if !codec::json::skip_comma_or_close(r, b'}')? {
                     r.advance(1);
                     break;
                 }
@@ -1189,7 +1183,6 @@ mod btreemap_impl {
             r: &mut io::ReadBuffer<'de>,
             arena: &'de crate::arena::Arena,
         ) -> Result<Self, Error> {
-            codec::json::skip_whitespace(r);
             r.expect_byte(b'{')?;
             let mut map = BTreeMap::new();
             codec::json::skip_whitespace(r);
@@ -1198,14 +1191,11 @@ mod btreemap_impl {
                 return Ok(map);
             }
             loop {
-                codec::json::skip_whitespace(r);
                 let key = codec::json::read_string_cow(r)?.into_owned();
-                codec::json::skip_whitespace(r);
-                r.expect_byte(b':')?;
+                codec::json::skip_colon(r)?;
                 let val = V::decode(r, arena)?;
                 map.insert(key, val);
-                codec::json::skip_comma_or_close(r, b'}')?;
-                if r.peek() == b'}' {
+                if !codec::json::skip_comma_or_close(r, b'}')? {
                     r.advance(1);
                     break;
                 }
@@ -1230,9 +1220,14 @@ macro_rules! impl_tuple {
 
         impl<'de, $($T: Decode<'de>),+> Decode<'de> for ($($T,)+) {
             #[inline]
-            fn decode(r: &mut io::ReadBuffer<'de>, allocator: &'de crate::arena::Arena) -> Result<Self, Error> {
+            fn decode(
+                r: &mut io::ReadBuffer<'de>,
+                arena: &'de crate::arena::Arena,
+            ) -> Result<Self, Error> {
                 r.expect_byte(b'[')?;
-                impl_tuple!(@decode r allocator $($idx $T),+);
+                codec::json::skip_whitespace(r);
+                impl_tuple!(@decode r arena $($idx $T),+);
+                codec::json::skip_whitespace(r);
                 r.expect_byte(b']')?;
                 Ok(($($T,)+))
             }
@@ -1248,7 +1243,6 @@ macro_rules! impl_tuple {
     };
 
     (@decode $r:ident $allocator:ident $first_idx:tt $first_T:ident $(, $idx:tt $T:ident)*) => {
-        codec::json::skip_whitespace($r);
         #[allow(non_snake_case)]
         let $first_T = $first_T::decode($r, $allocator)?;
         $(
@@ -1288,9 +1282,8 @@ impl<'de> Decode<'de> for alloc::borrow::Cow<'de, str> {
     #[inline]
     fn decode(
         r: &mut crate::io::ReadBuffer<'de>,
-        arena: &'de crate::arena::Arena,
+        _: &'de crate::arena::Arena,
     ) -> Result<Self, Error> {
-        let s = <&'de str>::decode(r, arena)?;
-        Ok(alloc::borrow::Cow::Borrowed(s))
+        crate::codec::json::read_string_cow(r)
     }
 }

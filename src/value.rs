@@ -1,3 +1,25 @@
+//! Dynamic JSON DOM (Value)
+//!
+//! This module provides a flexible, dynamically typed JSON representation (`Value`).
+//! It uses traditional Rust collections like `String`, `Vec`, and `BTreeMap`.
+//!
+//! This is the standard way to interact with arbitrary JSON payloads where the
+//! structure is unknown at compile time.
+//!
+//! > **Performance Note**: `Value` incurs heap allocations for every string, array,
+//! > and object. If you need maximum performance for unstructured data, consider
+//! > using [`crate::tape::TapeNode`] instead, which is completely zero-allocation.
+//!
+//! # Example
+//!
+//! ```ignore
+//! use fastserial::value::Value;
+//! use fastserial::Decode;
+//!
+//! let mut buf = ReadBuffer::new(br#"{"score": 100}"#);
+//! let val = Value::decode(&mut buf, &arena).unwrap();
+//! ```
+
 use crate::{Decode, Encode, Error, io};
 use alloc::collections::BTreeMap;
 use alloc::string::String;

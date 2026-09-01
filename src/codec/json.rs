@@ -1,31 +1,19 @@
+//! A high-performance JSON encoding and decoding implementation.
+//!
+//! This module provides specialized traits and functions for working with JSON data.
+//! It leverages SIMD acceleration for scanning and escaping, and procedural macros
+//! for specialized code generation.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use fastserial::{Encode, Decode, json};
+//! // ...
+//! ```
+
 use crate::Error;
 use crate::io::{ReadBuffer, WriteBuffer};
 use crate::simd;
-
-/// A high-performance JSON encoding and decoding implementation.
-///
-/// This module provides specialized traits and functions for working with JSON data.
-/// It leverages SIMD acceleration for scanning and escaping, and procedural macros
-/// for specialized code generation.
-///
-/// # Examples
-///
-/// ```rust
-/// use fastserial::{Encode, Decode, json};
-///
-/// #[derive(Encode, Decode, Debug, PartialEq)]
-/// struct Point {
-///     x: i32,
-///     y: i32,
-/// }
-///
-/// # fn main() -> Result<(), fastserial::Error> {
-/// let p = Point { x: 1, y: 2 };
-/// let json_data = json::encode(&p)?;
-/// assert_eq!(String::from_utf8_lossy(&json_data), r#"{"x":1,"y":2}"#);
-/// # Ok(())
-/// # }
-/// ```
 pub trait Format {
     /// Encodes a struct using this format.
     ///
@@ -443,7 +431,6 @@ fn parse_8_digits_swar(chunk: u64) -> (u64, u32) {
 /// number) returns `Error::NumberOverflow` instead of silently wrapping.
 #[inline(always)]
 pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
-    skip_whitespace(r);
     let start = r.pos;
     let data = &*r.data;
 
@@ -504,7 +491,6 @@ pub fn read_unsigned(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
 
 #[inline(always)]
 pub fn read_signed(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
-    skip_whitespace(r);
     let data = &*r.data;
     let neg = r.pos < data.len() && data[r.pos] == b'-';
     if neg {
@@ -529,7 +515,6 @@ pub fn read_signed(r: &mut ReadBuffer<'_>) -> Result<i64, Error> {
 
 #[inline(always)]
 pub fn read_float(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
-    skip_whitespace(r);
     let start = r.pos;
     let data = &*r.data;
 
@@ -671,27 +656,21 @@ pub fn read_string<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de str, Error> {
 pub fn read_key_fast<'de>(r: &mut ReadBuffer<'de>) -> Result<&'de [u8], Error> {
     r.expect_byte(b'"')?;
 
-    // Use SIMD to find quote or backslash faster
     let remaining = r.remaining_slice();
-    let end = simd::scan_quote_or_backslash(remaining);
-    let abs = r.pos + end;
+    let mut end = 0;
 
-    if abs >= r.data.len() {
-        return Err(Error::UnexpectedEof);
-    }
-
-    let ch = r.data[abs];
-
-    if ch == b'"' {
-        // Found end of key
-        let result = r.peek_slice(end);
-        r.pos = abs + 1;
-        return Ok(result);
-    }
-
-    // Found backslash in key - not allowed for keys
-    if ch == b'\\' {
-        return Err(Error::UnexpectedByte);
+    // A simple loop is faster for short keys than SIMD dispatch overhead
+    while end < remaining.len() {
+        let b = remaining[end];
+        if b == b'"' {
+            let result = r.peek_slice(end);
+            r.pos += end + 1;
+            return Ok(result);
+        }
+        if b == b'\\' {
+            return Err(Error::UnexpectedByte);
+        }
+        end += 1;
     }
 
     Err(Error::UnexpectedEof)
@@ -1224,7 +1203,6 @@ pub fn write_bytes(v: &[u8], w: &mut impl WriteBuffer) -> Result<(), Error> {
 }
 
 pub fn read_u64(r: &mut ReadBuffer<'_>) -> Result<u64, Error> {
-    skip_whitespace(r);
     read_unsigned(r)
 }
 
@@ -1266,7 +1244,6 @@ pub fn read_f64(r: &mut ReadBuffer<'_>) -> Result<f64, Error> {
 
 #[inline(always)]
 pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
-    skip_whitespace(r);
     let remaining = r.remaining_slice();
     if remaining.len() >= 5 {
         let p = remaining.as_ptr();
@@ -1306,7 +1283,6 @@ pub fn read_bool(r: &mut ReadBuffer<'_>) -> Result<bool, Error> {
 
 #[inline(always)]
 pub fn read_null(r: &mut ReadBuffer<'_>) -> Result<(), Error> {
-    skip_whitespace(r);
     let remaining = r.remaining_slice();
     if remaining.len() >= 4 {
         let val = unsafe { core::ptr::read_unaligned(remaining.as_ptr() as *const u32) };

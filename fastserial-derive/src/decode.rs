@@ -9,8 +9,13 @@
 //! - **SIMD-accelerated string scanning**: Uses SIMD instructions to find
 //!   quoted strings and escape characters faster than linear scanning.
 //! - **Whitespace skipping**: Optimized whitespace skipping using SIMD.
-//! - **Field matching**: Linear O(n) comparison for field name matching.
-//! - **Error handling**: Comprehensive error types for malformed JSON.
+//! - **Field matching**: Binary search O(log n) comparison for field name matching.
+//! - **Serde-compatible Attributes**: Full support for `#[fastserial(rename = "...")]`,
+//!   `#[fastserial(rename_all = "...")]`, `#[fastserial(default)]`, and `#[fastserial(skip)]`.
+//! - **Zero-copy Deserialization**: Borrows directly from the underlying buffer
+//!   into strings (`&str`) to minimize allocations.
+//! - **Error handling**: Comprehensive error types for malformed JSON, including
+//!   detailed `MissingField` diagnostics.
 //!
 //! # Example
 //!
@@ -18,13 +23,18 @@
 //! use fastserial::Decode;
 //!
 //! #[derive(Decode)]
-//! struct Point {
-//!     x: i32,
-//!     y: i32,
+//! #[fastserial(rename_all = "camelCase")]
+//! struct User {
+//!     id: u64,
+//!     #[fastserial(rename = "username")]
+//!     name: String,
+//!     #[fastserial(default)]
+//!     age: u32,
 //! }
 //!
-//! let json = br#"{"x":1,"y":2}"#;
-//! let point = Point::decode(&mut ReadBuffer::new(json)).unwrap();
+//! let json = br#"{"id":1,"username":"admin"}"#;
+//! let user = User::decode(&mut ReadBuffer::new(json), &arena).unwrap();
+//! assert_eq!(user.age, 0); // Fell back to default!
 //! ```
 
 use proc_macro2::TokenStream;
@@ -68,6 +78,8 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     }
     let (impl_gens, _, _) = impl_generics.split_for_impl();
 
+    let container_attrs = crate::attrs::parse_container_attrs(&input.attrs);
+
     let fields = match &input.data {
         Data::Struct(s) => &s.fields,
         _ => {
@@ -80,27 +92,17 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
     let mut field_inits = quote! {};
     let mut field_defaults = quote! {};
     let mut key_strings: Vec<String> = Vec::new();
-    // (length, field_name_str, var_ident) for length-bucketed dispatch.
     let mut active_fields: Vec<(usize, String, syn::Ident)> = Vec::new();
 
     for field in fields.iter() {
         let field_name = field.ident.as_ref().unwrap();
         let field_ty = &field.ty;
-        let mut field_name_str = field_name.to_string();
-        let mut skip = false;
-
-        for attr in &field.attrs {
-            if attr.meta.path().is_ident("fastserial") {
-                let _ = attr.parse_nested_meta(|meta: syn::meta::ParseNestedMeta| {
-                    if meta.path.is_ident("skip") {
-                        skip = true;
-                    } else if meta.path.is_ident("rename") {
-                        let lit: syn::LitStr = meta.value()?.parse()?;
-                        field_name_str = lit.value();
-                    }
-                    Ok(())
-                });
-            }
+        let field_attrs = crate::attrs::parse_field_attrs_raw(field);
+        
+        let skip = field_attrs.skip;
+        let mut field_name_str = container_attrs.rename_all.apply_to_field(&field_name.to_string());
+        if let Some(r) = field_attrs.rename {
+            field_name_str = r;
         }
 
         if skip {
@@ -117,9 +119,33 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
             let mut #var_ident: Option<#field_ty> = None;
         });
 
-        field_defaults.extend(quote! {
-            #field_name: #var_ident.ok_or(::fastserial::Error::MissingField)?,
-        });
+        // Determine default value
+        if let Some(path_str) = &field_attrs.default_path {
+            let path: syn::Path = syn::parse_str(path_str).unwrap();
+            field_defaults.extend(quote! {
+                #field_name: #var_ident.unwrap_or_else(#path),
+            });
+        } else if field_attrs.default {
+            field_defaults.extend(quote! {
+                #field_name: #var_ident.unwrap_or_else(Default::default),
+            });
+        } else if let Some(path_str) = &container_attrs.default_path {
+            let path: syn::Path = syn::parse_str(path_str).unwrap();
+            field_defaults.extend(quote! {
+                #field_name: #var_ident.unwrap_or_else(|| #path().#field_name),
+            });
+        } else if container_attrs.default {
+            field_defaults.extend(quote! {
+                #field_name: #var_ident.unwrap_or_else(|| {
+                    let __default: #name = Default::default();
+                    __default.#field_name
+                }),
+            });
+        } else {
+            field_defaults.extend(quote! {
+                #field_name: #var_ident.ok_or(::fastserial::Error::MissingField)?,
+            });
+        }
 
         active_fields.push((field_name_str.len(), field_name_str.clone(), var_ident));
         key_strings.push(field_name_str);
@@ -175,7 +201,6 @@ pub fn derive_decode(input: DeriveInput) -> TokenStream {
             fn decode(r: &mut ::fastserial::io::ReadBuffer<'de>, _arena: &'de ::fastserial::arena::Arena) -> ::core::result::Result<Self, ::fastserial::Error> {
                 #field_inits
 
-                ::fastserial::codec::json::skip_whitespace(r);
                 r.expect_byte(b'{')?;
                 ::fastserial::codec::json::skip_whitespace(r);
 

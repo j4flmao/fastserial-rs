@@ -56,33 +56,59 @@ fn detect_level() -> u8 {
 
 #[inline(always)]
 pub fn scan_quote_or_backslash(input: &[u8]) -> usize {
-    if input.len() < 32 {
-        return scalar::scan_quote_or_backslash(input);
+    let mut i = 0;
+    while i < input.len() && i < 16 {
+        let b = input[i];
+        if b == b'"' || b == b'\\' {
+            return i;
+        }
+        i += 1;
     }
-    match simd_level() {
+    if i == input.len() {
+        return i;
+    }
+
+    let rest = &input[i..];
+    if rest.len() < 32 {
+        return i + scalar::scan_quote_or_backslash(rest);
+    }
+    i + match simd_level() {
         #[cfg(target_arch = "x86_64")]
-        LEVEL_AVX2 => unsafe { avx2::scan_quote_or_backslash(input) },
+        LEVEL_AVX2 => unsafe { avx2::scan_quote_or_backslash(rest) },
         #[cfg(target_arch = "x86_64")]
-        LEVEL_SSE42 => unsafe { sse42::scan_quote_or_backslash(input) },
+        LEVEL_SSE42 => unsafe { sse42::scan_quote_or_backslash(rest) },
         #[cfg(target_arch = "aarch64")]
-        LEVEL_NEON => unsafe { neon::scan_quote_or_backslash(input) },
-        _ => scalar::scan_quote_or_backslash(input),
+        LEVEL_NEON => unsafe { neon::scan_quote_or_backslash(rest) },
+        _ => scalar::scan_quote_or_backslash(rest),
     }
 }
 
 #[inline(always)]
 pub fn scan_escape_chars(input: &[u8]) -> usize {
-    if input.len() < 32 {
-        return scalar::scan_escape_chars(input);
+    let mut i = 0;
+    while i < input.len() && i < 16 {
+        let b = input[i];
+        if b == b'"' || b == b'\\' || b == b'\n' || b == b'\r' || b == b'\t' {
+            return i;
+        }
+        i += 1;
     }
-    match simd_level() {
+    if i == input.len() {
+        return i;
+    }
+
+    let rest = &input[i..];
+    if rest.len() < 32 {
+        return i + scalar::scan_escape_chars(rest);
+    }
+    i + match simd_level() {
         #[cfg(target_arch = "x86_64")]
-        LEVEL_AVX2 => unsafe { avx2::scan_escape_chars(input) },
+        LEVEL_AVX2 => unsafe { avx2::scan_escape_chars(rest) },
         #[cfg(target_arch = "x86_64")]
-        LEVEL_SSE42 => unsafe { sse42::scan_escape_chars(input) },
+        LEVEL_SSE42 => unsafe { sse42::scan_escape_chars(rest) },
         #[cfg(target_arch = "aarch64")]
-        LEVEL_NEON => unsafe { neon::scan_escape_chars(input) },
-        _ => scalar::scan_escape_chars(input),
+        LEVEL_NEON => unsafe { neon::scan_escape_chars(rest) },
+        _ => scalar::scan_escape_chars(rest),
     }
 }
 
